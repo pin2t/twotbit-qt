@@ -10,3 +10,6 @@ CMakeLists.txt.user*
 *.db.lock
 twotbit.log
 twotbit.log.old
+
+# macOS Finder metadata
+.DS_Store
