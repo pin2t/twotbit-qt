@@ -82,7 +82,6 @@ private slots:
     void walletLoader();
     void localNetworkPhrase();
     void bitfynDatabase();
-    void credentialManager();
     void realChains();
 };
 
@@ -108,7 +107,6 @@ private slots:
 class AppTests : public QObject {
     Q_OBJECT
 private slots:
-    void pinterfaceIID();
     void launchOptions();
     void sendFlow();
 };

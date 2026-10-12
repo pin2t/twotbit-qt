@@ -1,10 +1,9 @@
 #include "tests.h"
 
-#include <winsock2.h>
-
 #include "p2p/hostport.h"
 #include "p2p/messages.h"
 #include "p2p/tcp.h"
+#include "sockets.h"
 #include "util/strings.h"
 #include "wallet/spend.h"
 
@@ -159,19 +158,12 @@ void WireTests::overlayHosts() {
 void WireTests::tcpStream() {
     // A stream reads exact lengths across chunks, sends what the other side
     // reads, fails its reads once closed and gives up at a deadline.
-    ensureSockets();
-    SOCKET listener = socket(AF_INET, SOCK_STREAM, IPPROTO_TCP);
-    sockaddr_in address{};
-    address.sin_family = AF_INET;
-    address.sin_addr.s_addr = htonl(INADDR_LOOPBACK);
-    QVERIFY(bind(listener, reinterpret_cast<sockaddr*>(&address), sizeof address) == 0);
-    QVERIFY(listen(listener, 1) == 0);
-    int length = sizeof address;
-    getsockname(listener, reinterpret_cast<sockaddr*>(&address), &length);
-    std::unique_ptr<TcpStream> client = TcpStream::connect("127.0.0.1", ntohs(address.sin_port), 5s);
-    SOCKET accepted = accept(listener, nullptr, nullptr);
-    closesocket(listener);
-    std::unique_ptr<TcpStream> server = TcpStream::adopt(uintptr_t(accepted), "client");
+    Sockets::Listener listener = Sockets::listen(1);
+    std::unique_ptr<TcpStream> client = TcpStream::connect("127.0.0.1", listener.port, 5s);
+    std::optional<uintptr_t> accepted = Sockets::accept(listener.socket);
+    Sockets::close(listener.socket);
+    QVERIFY(accepted);
+    std::unique_ptr<TcpStream> server = TcpStream::adopt(*accepted, "client");
     Bytes big(300'000);
     for (size_t i = 0; i < big.size(); ++i) big[i] = uint8_t(i * 31);
     client->send(big);

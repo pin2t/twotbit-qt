@@ -157,6 +157,8 @@ windows/                what is Windows' own, added to the common targets
   core/storage          the Credential Manager secret store
   app/                  Windows Hello and the password before the phrase is shown
     resources           the icon, version information and manifest
+  tests/                the Credential Manager and Windows Hello suites, and
+                        the Winsock listeners of the mock nodes
   scripts/make-icon.ps1 packs the macOS app's icon images into twotbit.ico
 tests/                  the QtTest suites, the fixture reader, a mock Bitcoin node
 third_party/sqlite      SQLite 3.53.4, the amalgamation

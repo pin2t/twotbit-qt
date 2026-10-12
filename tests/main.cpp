@@ -9,6 +9,10 @@
 
 #include "tests.h"
 
+#ifdef _WIN32
+#include "test_windows.h"
+#endif
+
 // Runs every suite, or the ones named on the command line before the QtTest
 // options, as `twotbit_tests SyncTests fullSync -o -,tap`.
 int main(int argc, char** argv) {
@@ -22,6 +26,9 @@ int main(int argc, char** argv) {
     suites.push_back(std::make_unique<tb::test::FormatTests>());
     suites.push_back(std::make_unique<tb::test::SyncTests>());
     suites.push_back(std::make_unique<tb::test::AppTests>());
+#ifdef _WIN32
+    suites.push_back(std::make_unique<tb::test::WindowsTests>());
+#endif
 
     std::vector<char*> args{argv[0]};
     std::vector<std::string> only;

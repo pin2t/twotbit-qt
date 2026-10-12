@@ -1,8 +1,5 @@
 #include "mocknode.h"
 
-#include <winsock2.h>
-#include <ws2tcpip.h>
-
 #include <ctime>
 #include <stdexcept>
 
@@ -11,26 +8,20 @@
 #include "crypto/hashes.h"
 #include "p2p/hostport.h"
 #include "p2p/peer.h"
+#include "sockets.h"
 
 namespace tb::test {
 
 std::unique_ptr<MockNode> MockNode::start(const std::vector<Block>& blocks) {
-    ensureSockets();
     std::unique_ptr<MockNode> node(new MockNode());
-    SOCKET s = socket(AF_INET, SOCK_STREAM, IPPROTO_TCP);
-    if (s == INVALID_SOCKET) throw std::runtime_error("mock node: no socket");
-    sockaddr_in address{};
-    address.sin_family = AF_INET;
-    address.sin_addr.s_addr = htonl(INADDR_LOOPBACK);
-    address.sin_port = 0;
-    if (bind(s, reinterpret_cast<sockaddr*>(&address), sizeof address) != 0 || listen(s, 16) != 0) {
-        closesocket(s);
-        throw std::runtime_error("mock node: cannot listen");
+    Sockets::Listener listener;
+    try {
+        listener = Sockets::listen(16);
+    } catch (const std::exception& e) {
+        throw std::runtime_error(std::string("mock node: ") + e.what());
     }
-    int length = sizeof address;
-    getsockname(s, reinterpret_cast<sockaddr*>(&address), &length);
-    node->listener_ = uintptr_t(s);
-    node->port_ = ntohs(address.sin_port);
+    node->listener_ = listener.socket;
+    node->port_ = listener.port;
     node->reset(blocks);
     node->acceptor_ = std::thread([n = node.get()] { n->acceptLoop(); });
     return node;
@@ -40,7 +31,7 @@ MockNode::~MockNode() { stop(); }
 
 void MockNode::stop() {
     if (stopped_.exchange(true)) return;
-    closesocket(SOCKET(listener_));
+    Sockets::close(listener_);
     if (acceptor_.joinable()) acceptor_.join();
     for (auto& p : with([](State& s) { return s.peers; })) p->close();
     std::vector<std::thread> servers;
@@ -53,9 +44,9 @@ void MockNode::stop() {
 
 void MockNode::acceptLoop() {
     while (!stopped_) {
-        SOCKET client = accept(SOCKET(listener_), nullptr, nullptr);
-        if (client == INVALID_SOCKET) return;
-        auto stream = std::shared_ptr<TcpStream>(TcpStream::adopt(uintptr_t(client), "mock peer"));
+        std::optional<uintptr_t> client = Sockets::accept(listener_);
+        if (!client) return;
+        auto stream = std::shared_ptr<TcpStream>(TcpStream::adopt(*client, "mock peer"));
         with([&](State& s) {
             s.peers.push_back(stream);
             return 0;

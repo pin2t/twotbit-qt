@@ -7,6 +7,7 @@ add_executable(twotbit_tests
     main.cpp
     fixtures.cpp
     mocknode.cpp
+    sockets.h
     tests.h
     test_app.cpp
     test_crypto.cpp
@@ -19,11 +20,20 @@ add_executable(twotbit_tests
     "${app}/appmodel.cpp" "${app}/appmodel.h"
     "${app}/options.cpp" "${app}/options.h"
 )
-target_include_directories(twotbit_tests PRIVATE "${app}")
+target_include_directories(twotbit_tests PRIVATE "${CMAKE_CURRENT_SOURCE_DIR}" "${app}")
 target_compile_definitions(twotbit_tests PRIVATE TWOTBIT_FIXTURES_DIR="${TWOTBIT_FIXTURES_DIR}")
 target_compile_options(twotbit_tests PRIVATE -Wall -Wextra -Wno-missing-field-initializers -Wno-dangling-reference)
 target_link_libraries(twotbit_tests PRIVATE twotbit_core Qt6::Gui Qt6::Widgets Qt6::Test)
+
+# The platform's directory adds its own suites and the local sockets the
+# mock nodes listen on.
 if(WIN32)
+    set(windows "${CMAKE_SOURCE_DIR}/windows/tests")
+    target_sources(twotbit_tests PRIVATE
+        "${windows}/sockets.cpp"
+        "${windows}/test_windows.cpp" "${windows}/test_windows.h"
+    )
+    target_include_directories(twotbit_tests PRIVATE "${windows}")
     target_link_libraries(twotbit_tests PRIVATE twotbit_windows ws2_32)
 endif()
 

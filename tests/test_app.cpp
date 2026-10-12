@@ -13,7 +13,6 @@
 #include "options.h"
 #include "util/log.h"
 #include "wallet/bip39.h"
-#include "winauth.h"
 
 namespace tb::test {
 
@@ -32,14 +31,6 @@ bool waitFor(int ms, const std::function<bool()>& condition) {
 }
 
 } // namespace
-
-void AppTests::pinterfaceIID() {
-    // IAsyncOperation<UserConsentVerificationResult>, whose IID the Windows
-    // SDK headers list.
-    QString iid = WinAuth::pinterfaceIID(
-        "pinterface({9fc2b0bb-e446-44e2-aa61-9cab8f636af2};enum(Windows.Security.Credentials.UI.UserConsentVerificationResult;i4))");
-    EXPECT_EQ(iid.toStdString(), std::string("{fd596ffd-2318-558f-9dbe-d21df43764a5}"), "IID");
-}
 
 void AppTests::launchOptions() {
     LaunchOptions o = LaunchOptions::load({"twotbit", "-net", "signet", "-datadir", "C:\\wallets\\x", "-peer", " 1.2.3.4:38333 "});

@@ -231,21 +231,6 @@ void StoreTests::bitfynDatabase() {
     opened.store->close();
 }
 
-void StoreTests::credentialManager() {
-    // A secret round-trips through the Windows Credential Manager under a
-    // service name of its own, and is deleted again.
-    CredentialSecretStore secrets("com.pin2t.twotbit.test-" + toHex(Hashes::randomBytes(4)));
-    std::string account = "vpub-test-" + toHex(Hashes::randomBytes(4));
-    EXPECT(!secrets.secret(account), "nothing stored yet");
-    secrets.setSecret(vectorMnemonic, account, "Twotbit test credential");
-    EXPECT(secrets.secret(account) == std::optional<std::string>(vectorMnemonic), "stored");
-    secrets.setSecret("other words", account, "Twotbit test credential");
-    EXPECT(secrets.secret(account) == std::optional<std::string>("other words"), "replaced");
-    secrets.deleteSecret(account);
-    EXPECT(!secrets.secret(account), "deleted");
-    secrets.deleteSecret(account);
-}
-
 void StoreTests::realChains() {
     // Validates every header of real chains stored by bitfyn or the wallet,
     // with the full rules: TWOTBIT_CHAIN_DB lists network=path pairs, such
