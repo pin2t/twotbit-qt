@@ -1,0 +1,12 @@
+# build output
+/build/
+CMakeUserPresets.json
+CMakeLists.txt.user*
+
+# wallet data written by local runs
+*.db
+*.db-shm
+*.db-wal
+*.db.lock
+twotbit.log
+twotbit.log.old
