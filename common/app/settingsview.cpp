@@ -9,7 +9,7 @@
 #include <QScrollArea>
 
 #include "phrasedialog.h"
-#include "winauth.h"
+#include "ownerauth.h"
 
 namespace {
 
@@ -178,7 +178,7 @@ void SettingsView::networkPicked(int index) {
 }
 
 void SettingsView::reveal() {
-    if (!WinAuth::confirmOwner(window(), "Twotbit wants to show the wallet's recovery phrase.")) return;
+    if (!OwnerAuth::confirmOwner(window(), "Twotbit wants to show the wallet's recovery phrase.")) return;
     PhraseDialog dialog(model_.phraseWords(), window());
     dialog.exec();
 }

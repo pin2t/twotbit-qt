@@ -1,4 +1,6 @@
-# Twotbit for Windows: the Qt Widgets app over the wallet engine library.
+# Twotbit: the Qt Widgets app over the wallet engine library. common/ holds
+# the engine and the app every platform builds; windows/ adds what is
+# Windows' own.
 #
 #   cmake -S . -B build -G Ninja -DCMAKE_PREFIX_PATH=C:/Qt/6.12.0/mingw_64
 #   cmake --build build
@@ -35,8 +37,11 @@ find_package(Qt6 6.8 REQUIRED COMPONENTS Core Gui Widgets Network)
 qt_standard_project_setup()
 
 add_subdirectory(third_party)
-add_subdirectory(src/core)
-add_subdirectory(src/app)
+add_subdirectory(common/core)
+add_subdirectory(common/app)
+if(WIN32)
+    add_subdirectory(windows)
+endif()
 
 if(TWOTBIT_BUILD_TESTS)
     find_package(Qt6 REQUIRED COMPONENTS Gui Test)

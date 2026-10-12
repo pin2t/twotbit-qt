@@ -138,23 +138,28 @@ words.
 
 ```
 CMakeLists.txt          the build, taking the shared files from ../macos
-src/core/               the wallet engine, a C++20 port of TwotbitKit
-  util                  bytes, text, tasks and their cancellation, the log
-  crypto                SHA-256/512, RIPEMD-160, HMAC, PBKDF2, SipHash, Murmur3, secp256k1
-  encoding              Base58Check, Bech32/Bech32m
-  bitcoin               networks, headers, transactions, blocks, scripts, addresses
-  wallet                BIP39, BIP32, the BIP84 wallet, coin selection and signing
-  spv                   the validated header chain, GCS and bloom filters
-  p2p                   wire messages, TCP and DNS over Winsock, peers
-  sync                  the peer pool, header, filter and wallet sync, rescans
-  storage               SQLite store, Credential Manager, wallet loading
-  rates, format         BTC/USD rates; amounts, times, statistics, QR codes
-src/app/                the Qt Widgets app: AppModel (the GUI logic), the views
-                        and dialogs, the theme, Windows Hello
-  resources             the icon, version information and manifest
+common/                 what every platform builds
+  core/                 the wallet engine, a C++20 port of TwotbitKit
+    util                bytes, text, tasks and their cancellation, the log
+    crypto              SHA-256/512, RIPEMD-160, HMAC, PBKDF2, SipHash, Murmur3, secp256k1
+    encoding            Base58Check, Bech32/Bech32m
+    bitcoin             networks, headers, transactions, blocks, scripts, addresses
+    wallet              BIP39, BIP32, the BIP84 wallet, coin selection and signing
+    spv                 the validated header chain, GCS and bloom filters
+    p2p                 wire messages, peers, the TCP and DNS interface
+    sync                the peer pool, header, filter and wallet sync, rescans
+    storage             SQLite store, the secret store interface, wallet loading
+    rates, format       BTC/USD rates; amounts, times, statistics, QR codes
+  app/                  the Qt Widgets app: AppModel (the GUI logic), the views
+                        and dialogs, the theme
+windows/                what is Windows' own, added to the common targets
+  core/p2p/tcp.cpp      TCP and DNS over Winsock
+  core/storage          the Credential Manager secret store
+  app/                  Windows Hello and the password before the phrase is shown
+    resources           the icon, version information and manifest
+  scripts/make-icon.ps1 packs the macOS app's icon images into twotbit.ico
 tests/                  the QtTest suites, the fixture reader, a mock Bitcoin node
 third_party/sqlite      SQLite 3.53.4, the amalgamation
-scripts/make-icon.ps1   packs the macOS app's icon images into twotbit.ico
 ```
 
 ## Tests

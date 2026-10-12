@@ -1,6 +1,8 @@
 # twotbit_core is the wallet engine: BIP39/BIP84 keys, the validated SPV
 # header chain, BIP157/158 compact filters, the P2P peer pool and the wallet
-# sync, storage and rates. The app only adds the Qt Widgets interface.
+# sync, storage and rates. The app only adds the Qt Widgets interface. The
+# platform's directory adds the TCP and DNS of the P2P layer and the
+# credential store of the recovery phrase.
 add_library(twotbit_core STATIC
     util/bytes.cpp
     util/log.cpp
@@ -21,7 +23,6 @@ add_library(twotbit_core STATIC
     p2p/hostport.cpp
     p2p/messages.cpp
     p2p/peer.cpp
-    p2p/tcp.cpp
     storage/secrets.cpp
     storage/sqlite.cpp
     storage/store.cpp
@@ -39,11 +40,10 @@ add_library(twotbit_core STATIC
 )
 
 target_include_directories(twotbit_core PUBLIC "${CMAKE_CURRENT_SOURCE_DIR}")
-target_compile_definitions(twotbit_core PUBLIC WIN32_LEAN_AND_MEAN NOMINMAX _WIN32_WINNT=0x0A00)
 target_compile_options(twotbit_core PRIVATE -Wall -Wextra -Wno-missing-field-initializers)
 target_link_libraries(twotbit_core
     PUBLIC Qt6::Core Qt6::Network
-    PRIVATE secp256k1 sqlite3 ws2_32 bcrypt advapi32
+    PRIVATE secp256k1 sqlite3
 )
 
 # The BTC/USD rate history since 2010, shared with the macOS app.

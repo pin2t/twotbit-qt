@@ -1,5 +1,7 @@
 #include "winauth.h"
 
+#include "ownerauth.h"
+
 #include <QCryptographicHash>
 #include <QEventLoop>
 #include <QTimer>
@@ -214,3 +216,9 @@ bool confirmOwner(QWidget* parent, const QString& reason) {
 }
 
 } // namespace WinAuth
+
+namespace OwnerAuth {
+
+bool confirmOwner(QWidget* parent, const QString& reason) { return WinAuth::confirmOwner(parent, reason); }
+
+} // namespace OwnerAuth

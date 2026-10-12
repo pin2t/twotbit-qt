@@ -2,7 +2,7 @@
 # syncs against in-process mock nodes, checked against the vectors generated
 # from bitfyn and btcd that the macOS app's tests use, and the app's model
 # driven against a mock node.
-set(app "${CMAKE_SOURCE_DIR}/src/app")
+set(app "${CMAKE_SOURCE_DIR}/common/app")
 add_executable(twotbit_tests
     main.cpp
     fixtures.cpp
@@ -18,12 +18,14 @@ add_executable(twotbit_tests
     test_wallet.cpp
     "${app}/appmodel.cpp" "${app}/appmodel.h"
     "${app}/options.cpp" "${app}/options.h"
-    "${app}/winauth.cpp" "${app}/winauth.h"
 )
 target_include_directories(twotbit_tests PRIVATE "${app}")
 target_compile_definitions(twotbit_tests PRIVATE TWOTBIT_FIXTURES_DIR="${TWOTBIT_FIXTURES_DIR}")
 target_compile_options(twotbit_tests PRIVATE -Wall -Wextra -Wno-missing-field-initializers -Wno-dangling-reference)
-target_link_libraries(twotbit_tests PRIVATE twotbit_core Qt6::Gui Qt6::Widgets Qt6::Test ws2_32 credui runtimeobject)
+target_link_libraries(twotbit_tests PRIVATE twotbit_core Qt6::Gui Qt6::Widgets Qt6::Test)
+if(WIN32)
+    target_link_libraries(twotbit_tests PRIVATE twotbit_windows ws2_32)
+endif()
 
 # QtTest's plain text logger writes nothing to a redirected stdout on Windows;
 # its TAP logger does.

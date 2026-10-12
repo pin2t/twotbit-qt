@@ -6,7 +6,7 @@
 
 param(
     [string]$Source = "$PSScriptRoot\..\..\macos\App\Assets.xcassets\AppIcon.appiconset",
-    [string]$Output = "$PSScriptRoot\..\src\app\resources\twotbit.ico"
+    [string]$Output = "$PSScriptRoot\..\app\resources\twotbit.ico"
 )
 
 Add-Type -AssemblyName System.Drawing
