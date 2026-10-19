@@ -31,16 +31,18 @@ private:
 
 } // namespace
 
-// The symbol at a point size that makes it about as large as a Segoe icon
-// glyph of the same pixel size, scaled down further when it would not fit.
-QImage symbol(const QString& name, int pixels) {
+// By default the symbol at a point size that makes it about as large as a
+// Segoe icon glyph of the same pixel size, scaled down further when it would
+// not fit.
+QImage symbol(const QString& name, int pixels, double points, bool bold) {
     if (pixels <= 0) return {};
+    if (points <= 0) points = pixels * 0.7;
     CLocale c;
     @autoreleasepool {
         NSImage* image = [NSImage imageWithSystemSymbolName:name.toNSString() accessibilityDescription:nil];
         if (!image) return {};
-        NSImageSymbolConfiguration* configuration = [NSImageSymbolConfiguration configurationWithPointSize:pixels * 0.7
-                                                                                                   weight:NSFontWeightRegular
+        NSImageSymbolConfiguration* configuration = [NSImageSymbolConfiguration configurationWithPointSize:points
+                                                                                                   weight:bold ? NSFontWeightBold : NSFontWeightRegular
                                                                                                     scale:NSImageSymbolScaleMedium];
         image = [image imageWithSymbolConfiguration:configuration];
         NSSize size = image.size;

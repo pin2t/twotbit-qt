@@ -99,7 +99,7 @@ QRCodeView::QRCodeView(int side, QWidget* parent) : QWidget(parent), side_(side)
 void QRCodeView::setText(const QString& text) {
     if (text == text_ && code_) return;
     text_ = text;
-    code_ = tb::QRCode::encode(text.toStdString());
+    code_ = tb::QRCode::encode(text.toStdString(), tb::QRCode::Correction::Q);
     setAccessibleName("QR code of " + text);
     update();
 }
@@ -119,13 +119,25 @@ void QRCodeView::paintEvent(QPaintEvent*) {
     int sidePx = int(std::floor(std::min(width(), height()) * ratio));
     int cell = sidePx / total;
     int origin = (sidePx - cell * total) / 2 + cell * quiet;
+    tb::QRCode::Range hole = code_->center(logo);
     p.setRenderHint(QPainter::Antialiasing, false);
     p.scale(1 / ratio, 1 / ratio);
     QPainterPath path;
     for (int y = 0; y < code_->size(); ++y)
         for (int x = 0; x < code_->size(); ++x)
-            if (code_->isDark(x, y)) path.addRect(origin + x * cell, origin + y * cell, cell, cell);
+            if (code_->isDark(x, y) && !(hole.contains(x) && hole.contains(y))) path.addRect(origin + x * cell, origin + y * cell, cell, cell);
     p.fillPath(path, Qt::black);
+    // The logo in the cleared middle: the bold bitcoin sign on an orange
+    // disc, tilted as in the logo.
+    double start = origin + hole.start * cell, span = hole.count() * cell;
+    QRectF disc = QRectF(start, start, span, span).adjusted(cell / 2.0, cell / 2.0, -cell / 2.0, -cell / 2.0);
+    p.setRenderHints(QPainter::Antialiasing | QPainter::SmoothPixmapTransform);
+    p.setBrush(QColor(0xf7, 0x93, 0x1a));
+    p.drawEllipse(disc);
+    QImage mark = Theme::bitcoinSign(int(std::ceil(disc.width())), disc.width() * 0.6, Qt::white);
+    p.translate(disc.center());
+    p.rotate(14);
+    p.drawImage(QPointF(-mark.width() / 2.0, -mark.height() / 2.0), mark);
 }
 
 CopyButton::CopyButton(const QString& help, QWidget* parent) : QToolButton(parent) {

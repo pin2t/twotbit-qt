@@ -140,6 +140,17 @@ void FormatTests::fitAddresses() {
     }
 }
 
+void FormatTests::groupAddresses() {
+    const std::pair<const char*, const char*> cases[] = {
+        {"bc1q0r80j388qfu32q67u6zjx3lhm9wsf07gryt4xl", "bc1q0r 80j3 88qf u32q 67u6 zjx3 lhm9 wsf0 7gry t4xl"},
+        {"abcdefgh", "abcd efgh"},
+        {"abcdefghi", "abcde fghi"},
+        {"abcd", "abcd"},
+        {"", ""},
+    };
+    for (const auto& [address, want] : cases) EXPECT_EQ(Format::groupAddress(address), std::string(want), address);
+}
+
 void FormatTests::stats() {
     // A receive, a payment with change, a payment between the wallet's own
     // addresses, and a spend of wallet coins the wallet did not pay alone.
@@ -253,66 +264,95 @@ void FormatTests::rates() {
 
 void FormatTests::qrCodes() {
     // The codes of receive invoices stand upright and carry their format
-    // information, level M and the mask chosen, in both copies.
+    // information, the level and the mask chosen, in both copies.
+    using Correction = QRCode::Correction;
     const char* texts[] = {
         "bitcoin:bc1qcr8te4kr609gcawutmrza0j4xv80jy8z306fyu",
         "bitcoin:bcrt1q6rz28mcfaxtmd6v789l9rrlrusdprr9pz3cppk?amount=0.0015",
         "bitcoin:tb1q6rz28mcfaxtmd6v789l9rrlrusdprr9pqcpvkl?amount=21000000",
         "bc1qcr8te4kr609gcawutmrza0j4xv80jy8z306fyu",
     };
-    for (const char* text : texts) {
-        auto code = QRCode::encode(text);
-        QVERIFY(code);
-        EXPECT(code->isUpright(), text);
-        EXPECT_EQ(code->size(), code->version() * 4 + 17, text);
-        int data = 0 << 3 | code->mask();
-        int rem = data;
-        for (int i = 0; i < 10; ++i) rem = (rem << 1) ^ ((rem >> 9) * 0x537);
-        int want = (data << 10 | rem) ^ 0x5412;
-        int first = 0, second = 0;
-        for (int i = 0; i <= 5; ++i) first |= code->isDark(8, i) << i;
-        first |= code->isDark(8, 7) << 6 | code->isDark(8, 8) << 7 | code->isDark(7, 8) << 8;
-        for (int i = 9; i < 15; ++i) first |= code->isDark(14 - i, 8) << i;
-        for (int i = 0; i < 8; ++i) second |= code->isDark(code->size() - 1 - i, 8) << i;
-        for (int i = 8; i < 15; ++i) second |= code->isDark(8, code->size() - 15 + i) << i;
-        EXPECT_EQ(first, want, text);
-        EXPECT_EQ(second, want, text);
-        EXPECT(code->isDark(8, code->size() - 8), text);
+    const std::pair<Correction, int> levels[] = {{Correction::L, 1}, {Correction::M, 0}, {Correction::Q, 3}, {Correction::H, 2}};
+    for (const auto& [level, bits] : levels) {
+        for (const char* text : texts) {
+            auto code = QRCode::encode(text, level);
+            QVERIFY(code);
+            std::string name = text + std::string(" at ") + "LMQH"[int(level)];
+            EXPECT(code->correction() == level, name);
+            EXPECT(code->isUpright(), name);
+            EXPECT_EQ(code->size(), code->version() * 4 + 17, name);
+            int data = bits << 3 | code->mask();
+            int rem = data;
+            for (int i = 0; i < 10; ++i) rem = (rem << 1) ^ ((rem >> 9) * 0x537);
+            int want = (data << 10 | rem) ^ 0x5412;
+            int first = 0, second = 0;
+            for (int i = 0; i <= 5; ++i) first |= code->isDark(8, i) << i;
+            first |= code->isDark(8, 7) << 6 | code->isDark(8, 8) << 7 | code->isDark(7, 8) << 8;
+            for (int i = 9; i < 15; ++i) first |= code->isDark(14 - i, 8) << i;
+            for (int i = 0; i < 8; ++i) second |= code->isDark(code->size() - 1 - i, 8) << i;
+            for (int i = 8; i < 15; ++i) second |= code->isDark(8, code->size() - 15 + i) << i;
+            EXPECT_EQ(first, want, name);
+            EXPECT_EQ(second, want, name);
+            EXPECT(code->isDark(8, code->size() - 8), name);
+        }
     }
-    // 50 bytes take version 4: version 3 at level M holds 42.
+    // 50 bytes take version 4 at level M, which holds 62, past version 3's
+    // 42, and version 5 at level Q, past version 4's 46.
     EXPECT(QRCode::encode("bitcoin:bc1qcr8te4kr609gcawutmrza0j4xv80jy8z306fyu")->version() == 4, "smallest version");
-    EXPECT(QRCode::encode(std::string(2331, 'x'))->version() == 40, "largest version");
-    EXPECT(!QRCode::encode(std::string(2332, 'x')), "too long");
+    EXPECT(QRCode::encode("bitcoin:bc1qcr8te4kr609gcawutmrza0j4xv80jy8z306fyu", Correction::Q)->version() == 5, "smallest version at Q");
+    // The bytes version 40 holds at each level.
+    const std::pair<Correction, size_t> largest[] = {{Correction::L, 2953}, {Correction::M, 2331}, {Correction::Q, 1663}, {Correction::H, 1273}};
+    for (const auto& [level, bytes] : largest) {
+        std::string name(1, "LMQH"[int(level)]);
+        EXPECT(QRCode::encode(std::string(bytes, 'x'), level)->version() == 40, "largest version at " + name);
+        EXPECT(!QRCode::encode(std::string(bytes + 1, 'x'), level), "too long at " + name);
+    }
+    // The logo's square sits exactly in the middle and covers at least a
+    // finder pattern's width.
+    for (const char* text : texts) {
+        auto code = QRCode::encode(text, Correction::Q);
+        QRCode::Range hole = code->center(0.24);
+        EXPECT(hole.count() >= 7 && (code->size() - hole.count()) % 2 == 0, text);
+        EXPECT_EQ(hole.start, code->size() - hole.end, text);
+    }
 
     // With TWOTBIT_QR_DIR set, the codes of the invoices and of random texts
     // of every length up to version 40's are written there as PNG images,
-    // each with its text, for independent decoders to read back.
+    // each with its text, for independent decoders to read back: at every
+    // level, and the invoices at level Q also with their middle cleared for
+    // the logo.
     const char* dir = std::getenv("TWOTBIT_QR_DIR");
     if (!dir) return;
     std::vector<std::string> all(std::begin(texts), std::end(texts));
     all.push_back("bitcoin:bc1qé€\U0001F600 utf-8");
     Bytes random = Hashes::randomBytes(4096);
-    for (size_t length = 1, i = 0; length <= 2331; length += 1 + length / 9, ++i) {
+    for (size_t length = 1, i = 0; length <= 2953; length += 1 + length / 9, ++i) {
         std::string text;
         for (size_t k = 0; k < length; ++k) text.push_back(char(32 + random[(i * 131 + k) % random.size()] % 95));
         all.push_back(text);
     }
     std::filesystem::create_directories(pathOf(dir));
-    for (size_t i = 0; i < all.size(); ++i) {
-        auto code = QRCode::encode(all[i]);
-        QVERIFY(code);
-        const int scale = 4, quiet = 4, side = (code->size() + 2 * quiet) * scale;
+    auto save = [&](const QRCode& code, const std::string& text, const std::string& name, QRCode::Range hole) {
+        const int scale = 4, quiet = 4, side = (code.size() + 2 * quiet) * scale;
         QImage image(side, side, QImage::Format_Grayscale8);
         image.fill(255);
-        for (int y = 0; y < code->size(); ++y)
-            for (int x = 0; x < code->size(); ++x)
-                if (code->isDark(x, y))
+        for (int y = 0; y < code.size(); ++y)
+            for (int x = 0; x < code.size(); ++x)
+                if (code.isDark(x, y) && !(hole.contains(x) && hole.contains(y)))
                     for (int dy = 0; dy < scale; ++dy)
                         for (int dx = 0; dx < scale; ++dx) image.setPixel((quiet + x) * scale + dx, (quiet + y) * scale + dy, qRgb(0, 0, 0));
-        char name[32];
-        std::snprintf(name, sizeof name, "%03zu-v%02d-m%d", i, code->version(), code->mask());
-        image.save(QString::fromStdString(utf8Of(pathOf(dir) / (std::string(name) + ".png"))));
-        std::ofstream(pathOf(dir) / (std::string(name) + ".txt"), std::ios::binary) << all[i];
+        image.save(QString::fromStdString(utf8Of(pathOf(dir) / (name + ".png"))));
+        std::ofstream(pathOf(dir) / (name + ".txt"), std::ios::binary) << text;
+    };
+    for (const auto& [level, bytes] : largest) {
+        for (size_t i = 0; i < all.size() && all[i].size() <= bytes; ++i) {
+            auto code = QRCode::encode(all[i], level);
+            QVERIFY(code);
+            char name[32];
+            std::snprintf(name, sizeof name, "%c%03zu-v%02d-m%d", "LMQH"[int(level)], i, code->version(), code->mask());
+            save(*code, all[i], name, {});
+            if (level == Correction::Q && i < std::size(texts)) save(*code, all[i], std::string(name) + "-logo", code->center(0.24));
+        }
     }
 }
 

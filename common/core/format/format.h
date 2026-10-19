@@ -85,6 +85,11 @@ std::string relativeTime(int64_t unix, int64_t now);
 /// of its largest units: "1 year 2 months", "3 days", "less than a minute".
 std::string lifetime(int64_t created, int64_t now, int units);
 
+/// The address in groups of four characters counted from its end, for
+/// reading it out: the characters left over join the first group, so it
+/// alone may be longer, as in "bc1q0r 80j3 88qf … t4xl".
+std::string groupAddress(const std::string& address);
+
 /// The address shortened to its start and its last six characters around an
 /// ellipsis when longer than the room: the start as long as fits, at least
 /// five characters, "bc1q" and one more, or else dropped: "…ryt4xl". fits

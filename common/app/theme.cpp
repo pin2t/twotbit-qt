@@ -3,11 +3,14 @@
 #include <QAbstractButton>
 #include <QApplication>
 #include <QFontDatabase>
+#include <QFontMetricsF>
 #include <QPainter>
 #include <QPixmap>
 #include <QStyleHints>
 #include <QTimer>
 #include <QWidget>
+
+#include <algorithm>
 
 namespace Theme {
 
@@ -22,6 +25,15 @@ void applyAccent(QApplication& app) {
     palette.setColor(QPalette::Link, color);
     app.setPalette(palette);
 }
+
+#ifdef Q_OS_MACOS
+/// Paints the image's shape over in the color.
+void tint(QImage& image, const QColor& color) {
+    QPainter p(&image);
+    p.setCompositionMode(QPainter::CompositionMode_SourceIn);
+    p.fillRect(image.rect(), color);
+}
+#endif
 
 QColor mix(const QColor& base, const QColor& over, double amount) {
     return QColor::fromRgbF(float(base.redF() * (1 - amount) + over.redF() * amount), float(base.greenF() * (1 - amount) + over.greenF() * amount),
@@ -142,10 +154,7 @@ QPixmap glyphPixmap(Glyph g, const QColor& color, int size, double ratio) {
         image = QImage(pixels, pixels, QImage::Format_ARGB32_Premultiplied);
         image.fill(Qt::transparent);
     }
-    QPainter p(&image);
-    p.setCompositionMode(QPainter::CompositionMode_SourceIn);
-    p.fillRect(image.rect(), ink);
-    p.end();
+    tint(image, ink);
     QPixmap pixmap = QPixmap::fromImage(image);
 #else
     QPixmap pixmap(pixels, pixels);
@@ -161,6 +170,29 @@ QPixmap glyphPixmap(Glyph g, const QColor& color, int size, double ratio) {
 #endif
     pixmap.setDevicePixelRatio(ratio);
     return pixmap;
+}
+
+QImage bitcoinSign(int pixels, double size, const QColor& color) {
+#ifdef Q_OS_MACOS
+    if (QImage image = symbol("bitcoinsign", pixels, size, true); !image.isNull()) {
+        tint(image, color);
+        return image;
+    }
+#endif
+    QImage image(pixels, pixels, QImage::Format_ARGB32_Premultiplied);
+    image.fill(Qt::transparent);
+    QPainter p(&image);
+    p.setRenderHint(QPainter::TextAntialiasing);
+    QFont f = QApplication::font();
+    f.setPixelSize(std::max(1, int(size + 0.5)));
+    f.setBold(true);
+    p.setFont(f);
+    p.setPen(color);
+    // Centered by its ink, not by the line it would sit on.
+    const QString sign(QChar(0x20BF));
+    QRectF ink = QFontMetricsF(f).tightBoundingRect(sign);
+    p.drawText(QPointF(pixels / 2.0 - ink.center().x(), pixels / 2.0 - ink.center().y()), sign);
+    return image;
 }
 
 QIcon icon(Glyph g, const QColor& color, int size) {

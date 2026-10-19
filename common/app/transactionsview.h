@@ -11,9 +11,9 @@
 #include "appmodel.h"
 #include "widgets.h"
 
-/// AddressList stacks addresses closely, each shortened to fit, the
-/// wallet's own in bold and unknown ones in italics, aligned right when
-/// trailing.
+/// AddressList stacks addresses closely, grouped by fours and each
+/// shortened to fit, the wallet's own in bold and unknown ones in italics,
+/// aligned right when trailing.
 class AddressList : public QWidget {
     Q_OBJECT
 public:

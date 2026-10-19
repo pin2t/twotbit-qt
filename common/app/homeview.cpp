@@ -118,7 +118,7 @@ void BalanceView::refresh() {
 
 HomeView::HomeView(AppModel& model, QWidget* parent)
     : QWidget(parent), model_(model), main_(new QWidget), divider_(new Separator(Qt::Vertical)), transactions_(new TransactionsView(model)),
-      qr_(new QRCodeView(240)), address_(new QLabel) {
+      qrRoom_(new QWidget), qr_(new QRCodeView(qrSide)), address_(new QLabel) {
     auto* outer = new QHBoxLayout(this);
     outer->setContentsMargins(0, 0, 0, 0);
     outer->setSpacing(0);
@@ -129,14 +129,20 @@ HomeView::HomeView(AppModel& model, QWidget* parent)
     auto* layout = new QVBoxLayout(main_);
     layout->setContentsMargins(28, 16, 28, 24);
     layout->setSpacing(0);
-    layout->addStretch(1);
-    layout->addWidget(qr_, 0, Qt::AlignHCenter);
+    layout->addSpacerItem(new QSpacerItem(0, qrSide - qrRoom, QSizePolicy::Minimum, QSizePolicy::MinimumExpanding));
+    layout->setStretch(layout->count() - 1, 1);
+    // The code is laid over its room, outside the layout, its bottom on the
+    // room's.
+    qrRoom_->setFixedSize(qrSide, qrRoom);
+    layout->addWidget(qrRoom_, 0, Qt::AlignHCenter);
+    qr_->setParent(main_);
+    qrRoom_->installEventFilter(this);
     layout->addSpacing(14);
 
     auto* addressRow = new QHBoxLayout;
     addressRow->setSpacing(6);
     addressRow->addStretch(1);
-    address_->setFont(Theme::mono(1.08));
+    address_->setFont(Theme::mono(1.25));
     address_->setTextInteractionFlags(Qt::TextSelectableByMouse);
     addressRow->addWidget(address_);
     auto* copy = new CopyButton("Copy the address");
@@ -190,7 +196,13 @@ void HomeView::setWide(bool wide) {
         main_->setMaximumWidth(QWIDGETSIZE_MAX), main_->setMinimumWidth(0);
 }
 
+bool HomeView::eventFilter(QObject* watched, QEvent* event) {
+    if (watched == qrRoom_ && (event->type() == QEvent::Move || event->type() == QEvent::Resize))
+        qr_->move(qrRoom_->x(), qrRoom_->geometry().bottom() + 1 - qr_->height());
+    return QWidget::eventFilter(watched, event);
+}
+
 void HomeView::refreshAddress() {
-    address_->setText(model_.address());
+    address_->setText(q(tb::Format::groupAddress(model_.address().toStdString())));
     qr_->setText(model_.address());
 }

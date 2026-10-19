@@ -60,9 +60,10 @@ private:
 };
 
 /// HomeView is the wallet at a glance: the QR code of the current receive
-/// address with the address under it and a copy button after it, the
-/// balance, the Receive and Send buttons, and the wallet statistics at the
-/// bottom. In a wide window the transactions list alongside it at the right.
+/// address with the address under it, grouped by fours, and a copy button
+/// after it, the balance, the Receive and Send buttons, and the wallet
+/// statistics at the bottom. In a wide window the transactions list
+/// alongside it at the right.
 class HomeView : public QWidget {
     Q_OBJECT
 public:
@@ -71,13 +72,23 @@ public:
     /// Whether the window is wide enough to list the transactions too.
     void setWide(bool wide);
 
+protected:
+    bool eventFilter(QObject* watched, QEvent* event) override;
+
 private:
     void refreshAddress();
+
+    /// The side of the QR code, and the room it takes in the layout: the
+    /// code grows up past that room, into the space above it, so it does
+    /// not push what is under it down.
+    static constexpr int qrSide = 300;
+    static constexpr int qrRoom = 240;
 
     AppModel& model_;
     QWidget* main_;
     Separator* divider_;
     TransactionsView* transactions_;
+    QWidget* qrRoom_;
     QRCodeView* qr_;
     QLabel* address_;
     QPushButton* send_;

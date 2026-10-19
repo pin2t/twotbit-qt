@@ -51,10 +51,16 @@ QChar glyph(Glyph g);
 QString symbolName(Glyph g);
 
 /// The SF Symbol drawn in black on a transparent square of the pixels,
-/// centered, by macos/app/symbols.mm; null when the system has no such
-/// symbol.
-QImage symbol(const QString& name, int pixels);
+/// centered, by macos/app/symbols.mm: at the point size, 0.7 of the pixels
+/// unless given, scaled down when it would not fit, and bold when told; null
+/// when the system has no such symbol.
+QImage symbol(const QString& name, int pixels, double points = 0, bool bold = false);
 #endif
+
+/// The bitcoin sign, bold, in the color on a transparent square of the
+/// pixels, centered, as large as a font of the pixel size draws it: the SF
+/// Symbol on the Mac and the font's ₿ elsewhere.
+QImage bitcoinSign(int pixels, double size, const QColor& color);
 
 /// The glyph as an icon in the color, the window text's by default.
 QIcon icon(Glyph g, const QColor& color = QColor(), int size = 16);

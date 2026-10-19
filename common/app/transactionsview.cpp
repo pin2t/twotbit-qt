@@ -33,7 +33,7 @@ AddressList::AddressList(const std::vector<tb::TxAddress>& addresses, bool trail
         row->setFont(f);
         row->setAlignment(align);
         row->setTextInteractionFlags(Qt::TextSelectableByMouse);
-        row->setFullText(a.address.empty() ? QString("unknown") : q(a.address));
+        row->setFullText(a.address.empty() ? QString("unknown") : q(tb::Format::groupAddress(a.address)));
         layout->addWidget(row);
     }
     setSizePolicy(QSizePolicy::Expanding, QSizePolicy::Preferred);

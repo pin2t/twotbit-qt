@@ -97,6 +97,7 @@ private slots:
     void relativeTimes();
     void lifetimes();
     void fitAddresses();
+    void groupAddresses();
     void stats();
     void peers();
     void probes();

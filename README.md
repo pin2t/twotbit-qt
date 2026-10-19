@@ -36,7 +36,8 @@ I2P are not ported: peers are always dialed directly.
   pinned peer that headers and filters are always synced from.
 - **Rates**: BTC/USD history since 2010 ships with the app. Fresh rates come
   from Coinbase, Kraken and Bitstamp.
-- **Window**: Home (QR code, address, balance in BTC and USD, statistics),
+- **Window**: Home (QR code with the bitcoin logo, address in groups of
+  four, balance in BTC and USD, statistics),
   Coins (sortable table, multi-selection that Send starts from),
   Transactions (inputs → outputs, the wallet's own addresses in bold) and
   Settings. It uses the Windows 11 style with Bitcoin orange, in light and
@@ -258,7 +259,7 @@ build\twotbit_tests.exe SyncTests liveSync
 rem build a demo regtest wallet to open with -net regtest -datadir <dir>
 set TWOTBIT_DEMO_DIR=%TEMP%\twotbit-demo
 build\twotbit_tests.exe SyncTests demoWallet
-rem save QR codes of every version and mask as images, to check with a scanner
+rem save QR codes of every level, version and mask as images, to check with a scanner
 set TWOTBIT_QR_DIR=%TEMP%\twotbit-qr
 build\twotbit_tests.exe FormatTests qrCodes
 ```

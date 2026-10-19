@@ -80,10 +80,15 @@ private:
 
 /// QRCodeView draws the QR code of a text dark on a light card with the
 /// quiet zone scanners need around it, its square modules aligned to whole
-/// device pixels so the code stays crisp.
+/// device pixels so the code stays crisp, and the bitcoin logo in its
+/// middle. The code is at level Q, so it still reads with the modules under
+/// the logo left out.
 class QRCodeView : public QWidget {
     Q_OBJECT
 public:
+    /// How much of the code's side the logo spans.
+    static constexpr double logo = 0.24;
+
     explicit QRCodeView(int side = 240, QWidget* parent = nullptr);
     void setText(const QString& text);
     QSize sizeHint() const override { return {side_, side_}; }

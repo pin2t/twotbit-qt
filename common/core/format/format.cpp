@@ -158,6 +158,15 @@ std::string lifetime(int64_t created, int64_t now, int units) {
     return "less than a minute";
 }
 
+std::string groupAddress(const std::string& address) {
+    if (address.size() <= 4) return address;
+    size_t rest = address.size() % 4;
+    size_t first = rest == 0 ? 4 : rest + 4;
+    std::string out = address.substr(0, first);
+    for (size_t i = first; i < address.size(); i += 4) out += " " + address.substr(i, 4);
+    return out;
+}
+
 std::string fitAddress(const std::string& address, const std::function<bool(const std::string&)>& fits) {
     const int tail = 6;
     const std::string ellipsis = "…";

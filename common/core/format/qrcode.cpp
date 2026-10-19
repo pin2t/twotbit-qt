@@ -3,19 +3,47 @@
 #include <algorithm>
 #include <array>
 #include <climits>
+#include <cmath>
 #include <cstdlib>
 
 namespace tb {
 
 namespace {
 
-// The error correction tables of ISO/IEC 18004 for level M, by version.
-constexpr int eccPerBlock[41] = {-1, 10, 16, 26, 18, 24, 16, 18, 22, 22, 26, 30, 22, 22, 24, 24, 28, 28, 26, 26, 26,
-                                 26, 28, 28, 28, 28, 28, 28, 28, 28, 28, 28, 28, 28, 28, 28, 28, 28, 28, 28, 28};
-constexpr int eccBlocks[41] = {-1, 1, 1, 1, 2, 2, 4, 4, 4, 5, 5, 5, 8, 9, 9, 10, 10, 11, 13, 14, 16,
-                               17, 17, 18, 20, 21, 23, 25, 26, 28, 29, 31, 33, 35, 37, 38, 40, 43, 45, 47, 49};
-/// The two format bits of level M.
-constexpr int formatBitsM = 0;
+using Correction = QRCode::Correction;
+
+// The error correction tables of ISO/IEC 18004 by level, L, M, Q and H, and
+// version: the error correction codewords of each block and the blocks.
+constexpr int eccPerBlockOf[4][41] = {
+    {-1, 7,  10, 15, 20, 26, 18, 20, 24, 30, 18, 20, 24, 26, 30, 22, 24, 28, 30, 28, 28,
+     28, 28, 30, 30, 26, 28, 30, 30, 30, 30, 30, 30, 30, 30, 30, 30, 30, 30, 30, 30},
+    {-1, 10, 16, 26, 18, 24, 16, 18, 22, 22, 26, 30, 22, 22, 24, 24, 28, 28, 26, 26, 26,
+     26, 28, 28, 28, 28, 28, 28, 28, 28, 28, 28, 28, 28, 28, 28, 28, 28, 28, 28, 28},
+    {-1, 13, 22, 18, 26, 18, 24, 18, 22, 20, 24, 28, 26, 24, 20, 30, 24, 28, 28, 26, 30,
+     28, 30, 30, 30, 30, 28, 30, 30, 30, 30, 30, 30, 30, 30, 30, 30, 30, 30, 30, 30},
+    {-1, 17, 28, 22, 16, 22, 28, 26, 26, 24, 28, 24, 28, 22, 24, 24, 30, 28, 28, 26, 28,
+     30, 24, 30, 30, 30, 30, 30, 30, 30, 30, 30, 30, 30, 30, 30, 30, 30, 30, 30, 30},
+};
+constexpr int eccBlocksOf[4][41] = {
+    {-1, 1, 1, 1, 1, 1, 2, 2, 2, 2, 4, 4, 4, 4, 4, 6, 6, 6, 6, 7, 8, 8, 9, 9, 10, 12, 12, 12, 13, 14, 15, 16, 17, 18, 19, 19, 20, 21, 22, 24, 25},
+    {-1, 1, 1, 1, 2, 2, 4, 4, 4, 5, 5, 5, 8, 9, 9, 10, 10, 11, 13, 14, 16, 17, 17, 18, 20, 21, 23, 25, 26, 28, 29, 31, 33, 35, 37, 38, 40, 43, 45, 47, 49},
+    {-1, 1, 1, 2, 2, 4, 4, 6, 6, 8, 8, 8, 10, 12, 16, 12, 17, 16, 18, 21, 20, 23, 23, 25, 27, 29, 34, 34, 35, 38, 40, 43, 45, 48, 51, 53, 56, 59, 62, 65, 68},
+    {-1, 1, 1, 2, 4, 4, 4, 5, 6, 8, 8, 11, 11, 16, 16, 18, 16, 19, 21, 25, 25, 25, 34, 30, 32, 35, 37, 40, 42, 45, 48, 51, 54, 57, 60, 63, 66, 70, 74, 77, 81},
+};
+
+int eccPerBlock(Correction c, int version) { return eccPerBlockOf[int(c)][version]; }
+int eccBlocks(Correction c, int version) { return eccBlocksOf[int(c)][version]; }
+
+/// The two format bits of the level.
+int formatBits(Correction c) {
+    switch (c) {
+    case Correction::L: return 1;
+    case Correction::M: return 0;
+    case Correction::Q: return 3;
+    case Correction::H: return 2;
+    }
+    return 0;
+}
 
 /// The modules of the version that hold data and error correction, after
 /// the function patterns.
@@ -29,7 +57,7 @@ int rawDataModules(int version) {
     return result;
 }
 
-int dataCodewords(int version) { return rawDataModules(version) / 8 - eccPerBlock[version] * eccBlocks[version]; }
+int dataCodewords(Correction c, int version) { return rawDataModules(version) / 8 - eccPerBlock(c, version) * eccBlocks(c, version); }
 
 std::vector<int> alignmentPositions(int version) {
     if (version == 1) return {};
@@ -78,9 +106,9 @@ std::vector<uint8_t> reedSolomonRemainder(const std::vector<uint8_t>& data, cons
 
 /// The data codewords followed by the error correction ones, split into the
 /// version's blocks and interleaved.
-std::vector<uint8_t> addECCAndInterleave(const std::vector<uint8_t>& data, int version) {
-    int numBlocks = eccBlocks[version];
-    int blockECCLen = eccPerBlock[version];
+std::vector<uint8_t> addECCAndInterleave(const std::vector<uint8_t>& data, Correction c, int version) {
+    int numBlocks = eccBlocks(c, version);
+    int blockECCLen = eccPerBlock(c, version);
     int rawCodewords = rawDataModules(version) / 8;
     int numShortBlocks = numBlocks - rawCodewords % numBlocks;
     int shortBlockLen = rawCodewords / numBlocks;
@@ -121,10 +149,11 @@ private:
 
 } // namespace
 
-QRCode::QRCode(int version)
-    : version_(version), size_(version * 4 + 17), modules_(size_t(size_ * size_), false), function_(size_t(size_ * size_), false) {}
+QRCode::QRCode(int version, Correction correction)
+    : version_(version), size_(version * 4 + 17), correction_(correction), modules_(size_t(size_ * size_), false),
+      function_(size_t(size_ * size_), false) {}
 
-std::optional<QRCode> QRCode::encode(const std::string& text) {
+std::optional<QRCode> QRCode::encode(const std::string& text, Correction correction) {
     std::vector<uint8_t> bytes(text.begin(), text.end());
     int version = 1;
     for (;; ++version) {
@@ -132,10 +161,10 @@ std::optional<QRCode> QRCode::encode(const std::string& text) {
         int countBits = version <= 9 ? 8 : 16;
         if (bytes.size() >= (size_t(1) << countBits)) continue;
         size_t needed = 4 + size_t(countBits) + bytes.size() * 8;
-        if (needed <= size_t(dataCodewords(version)) * 8) break;
+        if (needed <= size_t(dataCodewords(correction, version)) * 8) break;
     }
     int countBits = version <= 9 ? 8 : 16;
-    size_t capacity = size_t(dataCodewords(version)) * 8;
+    size_t capacity = size_t(dataCodewords(correction, version)) * 8;
     BitBuffer bb;
     bb.append(0x4, 4);
     bb.append(uint32_t(bytes.size()), countBits);
@@ -144,9 +173,9 @@ std::optional<QRCode> QRCode::encode(const std::string& text) {
     bb.append(0, int((8 - bb.size() % 8) % 8));
     for (uint8_t pad = 0xec; bb.size() < capacity; pad ^= 0xec ^ 0x11) bb.append(pad, 8);
 
-    QRCode code(version);
+    QRCode code(version, correction);
     code.drawFunctionPatterns();
-    code.drawCodewords(addECCAndInterleave(bb.bytes(), version));
+    code.drawCodewords(addECCAndInterleave(bb.bytes(), correction, version));
     long best = LONG_MAX;
     int bestMask = 0;
     for (int mask = 0; mask < 8; ++mask) {
@@ -192,7 +221,7 @@ void QRCode::drawFunctionPatterns() {
 }
 
 void QRCode::drawFormatBits(int mask) {
-    int data = formatBitsM << 3 | mask;
+    int data = formatBits(correction_) << 3 | mask;
     int rem = data;
     for (int i = 0; i < 10; ++i) rem = (rem << 1) ^ ((rem >> 9) * 0x537);
     int bits = (data << 10 | rem) ^ 0x5412;
@@ -332,6 +361,13 @@ long QRCode::penalty() const {
     long k = (std::labs(dark * 20 - total * 10) + total - 1) / total - 1;
     result += k * n4;
     return result;
+}
+
+QRCode::Range QRCode::center(double fraction) const {
+    int n = int(std::lround(size_ * fraction));
+    if ((size_ - n) % 2 != 0) ++n;
+    int start = (size_ - n) / 2;
+    return {start, start + n};
 }
 
 bool QRCode::isFinder(int x, int y) const {
