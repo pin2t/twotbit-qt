@@ -1,8 +1,10 @@
 #include "storage/store.h"
 
+#include <algorithm>
 #include <ctime>
 #include <filesystem>
 
+#include "p2p/hostport.h"
 #include "util/log.h"
 
 namespace tb {
@@ -66,8 +68,11 @@ create table if not exists peers (
     port      integer not null,
     services  integer not null default 0,
     latencyMs integer not null default 0,
-    okCount   integer not null default 0,
-    failCount integer not null default 0,
+    okCount     integer not null default 0,
+    failCount   integer not null default 0,
+    addedAt     integer not null default 0,
+    connectedAt integer not null default 0,
+    failedAt    integer not null default 0,
     primary key (host, port)
 );
 create table if not exists rates (
@@ -87,9 +92,39 @@ create table if not exists settings (
 const char* insertHeader = "insert or replace into headers (height, hash, prevHash, merkleRoot, version, timestamp, bits, nonce) values (?, ?, ?, ?, ?, ?, ?, ?)";
 const char* insertFilter = "insert or replace into cfilters (height, blockHash, filterHeader, filterData) values (?, ?, ?, ?)";
 
-int64_t now() { return int64_t(std::time(nullptr)); }
+/// Brings a database made by an earlier version up to the schema: the
+/// peers' times were added later, and peers stored before count as added
+/// now.
+void migrate(SQLiteDatabase& db) {
+    std::set<std::string> columns;
+    db.run("pragma table_info(peers)", {}, [&](const SQLiteDatabase::Row& row) { columns.insert(row.text(1)); });
+    if (columns.count("addedAt")) return;
+    db.transaction([&] {
+        for (const char* column : {"addedAt", "connectedAt", "failedAt"})
+            db.execute(std::string("alter table peers add column ") + column + " integer not null default 0");
+        db.run("update peers set addedAt = ?", {Store::unixNow()});
+    });
+}
+
+std::vector<PeerRecord> readPeers(SQLiteDatabase& db) {
+    std::vector<PeerRecord> out;
+    db.run("select host, port, services, latencyMs, okCount, failCount, addedAt, connectedAt, failedAt from peers", {},
+           [&](const SQLiteDatabase::Row& row) {
+               out.push_back(PeerRecord{row.text(0), uint16_t(row.integer(1)), uint64_t(row.integer(2)), row.integer(3), row.integer(4),
+                                        row.integer(5), row.integer(6), row.integer(7), row.integer(8)});
+           });
+    return out;
+}
 
 } // namespace
+
+double PeerRecord::value(int64_t now) const {
+    auto fresh = [&](int64_t t) { return t == 0 ? 0.0 : 1 / (1 + double(std::max<int64_t>(now - t, 0)) / 86'400); };
+    double rate = double(okCount + 1) / double(okCount + failCount + 2);
+    return fresh(addedAt) + 2 * fresh(connectedAt) * rate - fresh(failedAt) * (1 - rate);
+}
+
+int64_t Store::unixNow() { return int64_t(std::time(nullptr)); }
 
 std::unique_ptr<Store> Store::open(const std::string& path) {
     std::filesystem::path dir = pathOf(path).parent_path();
@@ -98,6 +133,7 @@ std::unique_ptr<Store> Store::open(const std::string& path) {
     try {
         db->execute("pragma journal_mode = wal; pragma synchronous = normal;");
         db->execute(schema);
+        migrate(*db);
     } catch (const SQLiteError& e) {
         if (e.code == 26) throw SQLiteError(26, "cannot read the wallet database (encrypted or not a database): " + e.message);
         throw;
@@ -142,7 +178,7 @@ void Store::updateNextIndex(uint32_t index) {
 void Store::addAddress(const std::string& kind, const DerivedAddress& a) {
     with([&](SQLiteDatabase& db) {
         db.run("insert or ignore into addresses (type, idx, derivationPath, address, pubkey, createdAt) values (?, ?, ?, ?, ?, ?)",
-               {kind, int64_t(a.index), a.path, a.address, a.pubkey, now()});
+               {kind, int64_t(a.index), a.path, a.address, a.pubkey, unixNow()});
     });
 }
 
@@ -318,42 +354,67 @@ void Store::deleteRescan(const RescanJob& r) {
     with([&](SQLiteDatabase& db) { db.run("delete from rescans where address = ? and fromHeight >= ?", {r.address, int64_t(r.from)}); });
 }
 
-void Store::savePeer(const std::string& host, uint16_t port) {
-    with([&](SQLiteDatabase& db) { db.run("insert or ignore into peers (host, port) values (?, ?)", {host, int64_t(port)}); });
+void Store::savePeer(const std::string& host, uint16_t port, int64_t now) {
+    with([&](SQLiteDatabase& db) { db.run("insert or ignore into peers (host, port, addedAt) values (?, ?, ?)", {host, int64_t(port), now}); });
 }
 
-void Store::upsertPeer(const std::string& host, uint16_t port, uint64_t services, int64_t latencyMs) {
+void Store::upsertPeer(const std::string& host, uint16_t port, uint64_t services, int64_t latencyMs, int64_t now) {
     with([&](SQLiteDatabase& db) {
-        db.run("insert into peers (host, port, services, latencyMs, okCount, failCount) values (?, ?, ?, ?, 0, 0) "
-               "on conflict(host, port) do update set services = excluded.services, latencyMs = excluded.latencyMs",
-               {host, int64_t(port), int64_t(services), latencyMs});
+        db.run("insert into peers (host, port, services, latencyMs, addedAt, connectedAt) values (?, ?, ?, ?, ?, ?) "
+               "on conflict(host, port) do update set services = excluded.services, latencyMs = excluded.latencyMs, "
+               "connectedAt = excluded.connectedAt",
+               {host, int64_t(port), int64_t(services), latencyMs, now, now});
     });
 }
 
-void Store::updatePeerServices(const std::string& host, uint16_t port, uint64_t services) {
+void Store::peerConnectFailed(const std::string& host, uint16_t port, int64_t now) {
     with([&](SQLiteDatabase& db) {
-        db.run("insert into peers (host, port, services) values (?, ?, ?) "
+        db.run("insert into peers (host, port, failCount, addedAt, failedAt) values (?, ?, 1, ?, ?) "
+               "on conflict(host, port) do update set failCount = failCount + 1, failedAt = excluded.failedAt",
+               {host, int64_t(port), now, now});
+    });
+}
+
+void Store::updatePeerServices(const std::string& host, uint16_t port, uint64_t services, int64_t now) {
+    with([&](SQLiteDatabase& db) {
+        db.run("insert into peers (host, port, services, addedAt) values (?, ?, ?, ?) "
                "on conflict(host, port) do update set services = excluded.services",
-               {host, int64_t(port), int64_t(services)});
+               {host, int64_t(port), int64_t(services), now});
     });
 }
 
-void Store::recordPeerResult(const std::string& host, uint16_t port, bool ok, int64_t latencyMs) {
+void Store::recordPeerResult(const std::string& host, uint16_t port, bool ok, int64_t latencyMs, int64_t now) {
     with([&](SQLiteDatabase& db) {
-        db.run("insert into peers (host, port, latencyMs, okCount, failCount) values (?, ?, ?, ?, ?) "
+        db.run("insert into peers (host, port, latencyMs, okCount, failCount, addedAt) values (?, ?, ?, ?, ?, ?) "
                "on conflict(host, port) do update set latencyMs = excluded.latencyMs, "
                "okCount = okCount + excluded.okCount, failCount = failCount + excluded.failCount",
-               {host, int64_t(port), latencyMs, int64_t(ok ? 1 : 0), int64_t(ok ? 0 : 1)});
+               {host, int64_t(port), latencyMs, int64_t(ok ? 1 : 0), int64_t(ok ? 0 : 1), now});
     });
 }
 
 std::vector<PeerRecord> Store::peers() {
+    return with([&](SQLiteDatabase& db) { return readPeers(db); });
+}
+
+int Store::prunePeers(int max, int keep, const std::set<std::string>& kept, int64_t now) {
     return with([&](SQLiteDatabase& db) {
-        std::vector<PeerRecord> out;
-        db.run("select host, port, services, latencyMs, okCount, failCount from peers", {}, [&](const SQLiteDatabase::Row& row) {
-            out.push_back(PeerRecord{row.text(0), uint16_t(row.integer(1)), uint64_t(row.integer(2)), row.integer(3), row.integer(4), row.integer(5)});
+        if (db.scalar("select count(*) from peers").value_or(0) <= max) return 0;
+        std::vector<PeerRecord> ranked = readPeers(db);
+        std::sort(ranked.begin(), ranked.end(), [&](const PeerRecord& a, const PeerRecord& b) { return a.value(now) > b.value(now); });
+        auto spared = [&](const PeerRecord& p) { return kept.count(HostPort::join(p.host, p.port)) > 0; };
+        int room = keep - int(std::count_if(ranked.begin(), ranked.end(), spared));
+        std::vector<const PeerRecord*> doomed;
+        for (const auto& p : ranked) {
+            if (spared(p)) continue;
+            if (room > 0)
+                --room;
+            else
+                doomed.push_back(&p);
+        }
+        db.transaction([&] {
+            for (const PeerRecord* p : doomed) db.run("delete from peers where host = ? and port = ?", {p->host, int64_t(p->port)});
         });
-        return out;
+        return int(doomed.size());
     });
 }
 

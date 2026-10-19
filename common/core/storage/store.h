@@ -4,6 +4,7 @@
 #include <memory>
 #include <mutex>
 #include <optional>
+#include <set>
 #include <string>
 #include <vector>
 
@@ -90,7 +91,9 @@ struct RescanJob {
     friend bool operator==(const RescanJob&, const RescanJob&) = default;
 };
 
-/// PeerRecord is one known peer with its connection statistics.
+/// PeerRecord is one known peer with its connection statistics: the
+/// requests it answered and failed, and the unix times it was first stored,
+/// last connected and last failed to connect, 0 for never.
 struct PeerRecord {
     std::string host;
     uint16_t port = 0;
@@ -98,6 +101,16 @@ struct PeerRecord {
     int64_t latencyMs = 0;
     int64_t okCount = 0;
     int64_t failCount = 0;
+    int64_t addedAt = 0;
+    int64_t connectedAt = 0;
+    int64_t failedAt = 0;
+
+    /// How worth dialing and keeping the peer is: high for a peer added
+    /// recently, and for one connected to recently that answers most of its
+    /// requests; low for one added long ago, or failing recently and most of
+    /// the time without a recent connection. Each time counts by its
+    /// freshness, 1 now, ½ a day ago, falling to 0 for never.
+    double value(int64_t now) const;
 
     friend bool operator==(const PeerRecord&, const PeerRecord&) = default;
 };
@@ -110,15 +123,23 @@ struct Rate {
     friend bool operator==(const Rate&, const Rate&) = default;
 };
 
-/// Store keeps the wallet in an SQLite database, with the same schema as
-/// bitfyn's and the macOS app's: the wallet metadata and addresses, the
-/// validated header chain, filter headers and matches, wallet transactions,
-/// known peers, rates and settings. Calls are serialized; it is safe to use
-/// from any thread.
+/// Store keeps the wallet in an SQLite database: the wallet metadata and
+/// addresses, the validated header chain, filter headers and matches, wallet
+/// transactions, known peers, rates and settings. It opens databases of
+/// bitfyn, the macOS app and earlier versions and upgrades them in place.
+/// Calls are serialized; it is safe to use from any thread.
 class Store {
 public:
     /// The settings key of the pinned peer's host:port.
     static constexpr const char* settingPinnedPeer = "pinnedPeer";
+
+    /// The peer table is cut back to keepPeers peers, the most valuable,
+    /// once it grows past maxPeers.
+    static constexpr int maxPeers = 3000;
+    static constexpr int keepPeers = 1000;
+
+    /// The current unix time, the default of the peer times.
+    static int64_t unixNow();
 
     /// Opens the database at the path, creating it and its directory as
     /// needed.
@@ -212,16 +233,24 @@ public:
 
     // Peers
 
-    /// Records a known peer address. Idempotent.
-    void savePeer(const std::string& host, uint16_t port);
-    /// Stores the services and handshake latency of a connected peer.
-    void upsertPeer(const std::string& host, uint16_t port, uint64_t services, int64_t latencyMs);
+    /// Records a known peer address, added now unless known already.
+    void savePeer(const std::string& host, uint16_t port, int64_t now = unixNow());
+    /// Stores the services and handshake latency of a peer just connected
+    /// to.
+    void upsertPeer(const std::string& host, uint16_t port, uint64_t services, int64_t latencyMs, int64_t now = unixNow());
+    /// Records a failed attempt to connect to the peer: a failure counted
+    /// and the time.
+    void peerConnectFailed(const std::string& host, uint16_t port, int64_t now = unixNow());
     /// Stores the advertised services of a gossiped peer.
-    void updatePeerServices(const std::string& host, uint16_t port, uint64_t services);
+    void updatePeerServices(const std::string& host, uint16_t port, uint64_t services, int64_t now = unixNow());
     /// Counts one successful or failed request against a peer and stores its
     /// latency.
-    void recordPeerResult(const std::string& host, uint16_t port, bool ok, int64_t latencyMs);
+    void recordPeerResult(const std::string& host, uint16_t port, bool ok, int64_t latencyMs, int64_t now = unixNow());
     std::vector<PeerRecord> peers();
+    /// Once more than max peers are stored, deletes the least valuable ones
+    /// down to keep, never the kept host:port addresses, as the pinned and
+    /// connected peers. It returns how many were deleted.
+    int prunePeers(int max = maxPeers, int keep = keepPeers, const std::set<std::string>& kept = {}, int64_t now = unixNow());
 
     // Settings
 

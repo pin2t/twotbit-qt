@@ -148,7 +148,7 @@ simnet, keep their phrase in the database instead.
 
 ### Moving a wallet over
 
-Twotbit uses bitfyn's database schema, as the macOS app does. To continue
+Twotbit opens bitfyn's databases and upgrades them in place. To continue
 with an unencrypted bitfyn wallet, quit both apps and copy its database to
 the data folder under Twotbit's name: `bitfyn.db` to
 `%LOCALAPPDATA%\Twotbit\twotbit.db`, `bitfyn-signet.db` to

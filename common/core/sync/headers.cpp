@@ -338,16 +338,14 @@ Hash256 SyncEngine::dialAnchor(const std::string& addr) {
     auto [host, port] = HostPort::split(addr);
     if (isOverlayHost(host)) throw PeerError("peer " + addr + " not dialed directly");
     PeerPtr c;
+    Duration handshake;
     try {
-        c = PeerConnection::connect(network_, addr, false, false,
-                                    [this](PeerConnection& peer, const Message& message) {
-                                        if (std::holds_alternative<msg::Addr>(message) || std::holds_alternative<msg::AddrV2>(message))
-                                            handle(peer, message);
-                                    })
-                .first;
+        std::tie(c, handshake) = PeerConnection::connect(network_, addr, false, false, [this](PeerConnection& peer, const Message& message) {
+            if (std::holds_alternative<msg::Addr>(message) || std::holds_alternative<msg::AddrV2>(message)) handle(peer, message);
+        });
     } catch (...) {
         try {
-            store_.recordPeerResult(host, port, false, 0);
+            store_.peerConnectFailed(host, port);
         } catch (const std::exception&) {
         }
         throw;
@@ -357,7 +355,7 @@ Hash256 SyncEngine::dialAnchor(const std::string& addr) {
         ~Disconnect() { c->disconnect(); }
     } disconnect{c};
     try {
-        store_.updatePeerServices(host, port, c->services().raw);
+        store_.upsertPeer(host, port, c->services().raw, toMilliseconds(handshake));
     } catch (const std::exception& e) {
         Log::info("store peer " + addr + ": " + e.what());
     }

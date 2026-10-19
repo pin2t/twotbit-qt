@@ -231,29 +231,37 @@ std::vector<std::string> SyncEngine::takeCandidates(size_t n) {
 }
 
 std::vector<std::string> SyncEngine::peerCandidates(const std::string& pinned) {
-    // The peers to fill the pool with: stored and freshly discovered peers in
-    // random order, without the pinned peer. Stored peers known not to serve
-    // compact filters are skipped, and so are onion and I2P peers the wallet
-    // does not dial. Peers come from the store and the DNS seeds. An empty
-    // list is an error only without a pinned peer.
-    std::vector<std::string> list;
+    // The peers to fill the pool with: stored and freshly discovered peers,
+    // without the pinned peer, the most valuable first: those added
+    // recently, and those connected to recently that answer most requests.
+    // Seeds not stored yet count as added now, and peers of equal value come
+    // in random order. Stored peers known not to serve compact filters are
+    // skipped, and so are onion and I2P peers the wallet does not dial. Peers
+    // come from the store and the DNS seeds. An empty list is an error only
+    // without a pinned peer.
+    int64_t now = Store::unixNow();
+    double newcomer = PeerRecord{.addedAt = now}.value(now);
+    std::vector<std::pair<std::string, double>> list;
     std::set<std::string> seen{pinned};
-    auto add = [&](const std::string& addr) {
+    auto add = [&](const std::string& addr, double value) {
         if (addr.empty() || !seen.insert(addr).second) return;
-        list.push_back(addr);
+        list.emplace_back(addr, value);
     };
     for (const auto& p : store_.peers()) {
         if (p.services != 0 && !ServiceFlags{p.services}.contains(ServiceFlags::compactFilters)) continue;
         if (isOverlayHost(p.host)) continue;
-        add(HostPort::join(p.host, p.port));
+        add(HostPort::join(p.host, p.port), p.value(now));
     }
-    for (const auto& seed : Dns::seeds(network_)) add(seed.description());
+    for (const auto& seed : Dns::seeds(network_)) add(seed.description(), newcomer);
     std::random_device device;
     std::mt19937_64 rng(uint64_t(device()) << 32 | device());
     std::shuffle(list.begin(), list.end(), rng);
+    std::stable_sort(list.begin(), list.end(), [](const auto& a, const auto& b) { return a.second > b.second; });
     if (list.empty() && pinned.empty())
         throw PeerError("no peer addresses for network " + network_.name + " (pass -peer or run a local node)");
-    return list;
+    std::vector<std::string> addrs;
+    for (auto& [addr, value] : list) addrs.push_back(std::move(addr));
+    return addrs;
 }
 
 bool SyncEngine::connect(const std::string& addr, bool pinned) {
@@ -274,7 +282,7 @@ bool SyncEngine::connect(const std::string& addr, bool pinned) {
         if (task::isCancelled()) return false;
         Log::info("peer " + addr + ": connect failed: " + e.what());
         try {
-            store_.recordPeerResult(host, port, false, 0);
+            store_.peerConnectFailed(host, port);
         } catch (const std::exception&) {
         }
         return false;
@@ -385,9 +393,11 @@ void SyncEngine::handle(PeerConnection& c, const Message& message) {
         }
     } else if (auto* m = std::get_if<msg::Addr>(&message)) {
         for (const auto& a : m->list) savePeerAddr(a.host(), a.port, a.services);
+        prunePeers();
     } else if (auto* m = std::get_if<msg::AddrV2>(&message)) {
         for (const auto& a : m->list)
             if (auto host = a.host()) savePeerAddr(*host, a.port, a.services);
+        prunePeers();
     }
 }
 
@@ -399,6 +409,23 @@ void SyncEngine::savePeerAddr(const std::string& host, uint16_t port, ServiceFla
         else
             store_.savePeer(host, port);
     } catch (const std::exception&) {
+    }
+}
+
+void SyncEngine::prunePeers() {
+    // Cuts the stored peers back to the most valuable once gossip grew them
+    // past Store::maxPeers, keeping the pinned and connected peers.
+    std::set<std::string> kept;
+    {
+        std::lock_guard lock(managerMutex_);
+        for (const auto& c : manager_.pool) kept.insert(c->address);
+        kept.insert(manager_.pinnedAddr);
+    }
+    try {
+        int n = store_.prunePeers(Store::maxPeers, Store::keepPeers, kept);
+        if (n > 0) Log::info("peers: removed " + std::to_string(n) + " least valuable stored peers");
+    } catch (const std::exception& e) {
+        Log::info(std::string("prune peers: ") + e.what());
     }
 }
 

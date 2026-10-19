@@ -350,6 +350,7 @@ private:
     void record(const PeerConnection& c, bool ok, TimePoint started);
     void handle(PeerConnection& c, const Message& message);
     void savePeerAddr(const std::string& host, uint16_t port, ServiceFlags services);
+    void prunePeers();
 
     template <class T>
     std::pair<std::vector<PeerPtr>, std::vector<T>> fanOut(const std::vector<PeerPtr>& peers, const std::string& what,

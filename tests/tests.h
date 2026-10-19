@@ -79,6 +79,9 @@ private slots:
     void headersFiltersAndRewind();
     void transactionsAndPending();
     void rescansPeersSettingsRates();
+    void peerValue();
+    void prunePeers();
+    void peerTimesMigration();
     void walletLoader();
     void localNetworkPhrase();
     void bitfynDatabase();

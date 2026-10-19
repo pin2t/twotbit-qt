@@ -143,14 +143,20 @@ void StoreTests::rescansPeersSettingsRates() {
     auto rescans = store->rescans();
     EXPECT(rescans.size() == 1 && rescans[0].address == "y", "finished");
 
-    store->savePeer("1.2.3.4", 8333);
-    store->recordPeerResult("1.2.3.4", 8333, true, 40);
-    store->recordPeerResult("1.2.3.4", 8333, false, 90);
-    store->upsertPeer("1.2.3.4", 8333, 1097, 30);
-    store->updatePeerServices("abc.onion", 8333, 64);
+    store->savePeer("1.2.3.4", 8333, 100);
+    store->savePeer("1.2.3.4", 8333, 150);
+    store->recordPeerResult("1.2.3.4", 8333, true, 40, 200);
+    store->recordPeerResult("1.2.3.4", 8333, false, 90, 300);
+    store->upsertPeer("1.2.3.4", 8333, 1097, 30, 400);
+    store->peerConnectFailed("1.2.3.4", 8333, 500);
+    store->updatePeerServices("abc.onion", 8333, 64, 600);
+    store->peerConnectFailed("5.6.7.8", 8333, 700);
     auto peers = store->peers();
     std::sort(peers.begin(), peers.end(), [](const PeerRecord& x, const PeerRecord& y) { return x.host < y.host; });
-    EXPECT((peers == std::vector<PeerRecord>{{"1.2.3.4", 8333, 1097, 30, 1, 1}, {"abc.onion", 8333, 64, 0, 0, 0}}), "peers");
+    EXPECT((peers == std::vector<PeerRecord>{{"1.2.3.4", 8333, 1097, 30, 1, 2, 100, 400, 500},
+                                             {"5.6.7.8", 8333, 0, 0, 0, 1, 700, 0, 700},
+                                             {"abc.onion", 8333, 64, 0, 0, 0, 600, 0, 0}}),
+           "peers");
 
     EXPECT_EQ(store->setting(Store::settingPinnedPeer), std::string(""), "unset");
     store->setSetting(Store::settingPinnedPeer, "1.2.3.4:8333");
@@ -163,6 +169,68 @@ void StoreTests::rescansPeersSettingsRates() {
     EXPECT(!store->seedRates({{3, 30}}), "seeded once");
     store->addRate(Rate{5, 50});
     EXPECT((store->latestRate() == Rate{5, 50}), "latest");
+    store->close();
+}
+
+void StoreTests::peerValue() {
+    // Peers added recently, or connected to recently and answering, are
+    // worth more than peers added long ago or failing recently.
+    const int64_t now = 10'000'000, day = 86'400;
+    auto peer = [&](int64_t added, int64_t connected = 0, int64_t failed = 0, int64_t ok = 0, int64_t fail = 0) {
+        return PeerRecord{"h", 1, 0, 0, ok, fail, added, connected, failed}.value(now);
+    };
+    double fresh = peer(now);
+    double stale = peer(now - 30 * day);
+    double reliable = peer(now - 30 * day, now - 3600, 0, 50, 2);
+    double reliableLongAgo = peer(now - 30 * day, now - 20 * day, 0, 50, 2);
+    double failing = peer(now - day, now - 20 * day, now - 60, 1, 9);
+    EXPECT(reliable > fresh, "reliable over fresh");
+    EXPECT(fresh > reliableLongAgo, "fresh over reliable long ago");
+    EXPECT(reliableLongAgo > stale, "reliable long ago over stale");
+    EXPECT(stale > failing, "stale over failing");
+    EXPECT(peer(now, now, 0, 10) > peer(now, now, 0, 10, 10), "answering more");
+    EXPECT(peer(now - day, now - day, 0, 5) > peer(now - day, now - 2 * day, 0, 5), "connected more recently");
+}
+
+void StoreTests::prunePeers() {
+    // Past the limit the table is cut back to the most valuable peers, the
+    // spared ones kept whatever their value.
+    TempDir dir;
+    auto store = Store::open(dir.file("wallet.db"));
+    for (int i = 0; i < 10; ++i) store->savePeer("10.0.0." + std::to_string(i), 8333, 1000 + i);
+    store->upsertPeer("10.0.0.0", 8333, 0, 1, 2000);
+    EXPECT_EQ(store->prunePeers(10, 4, {}, 2000), 0, "within the limit");
+    store->savePeer("10.0.0.10", 8333, 1010);
+    EXPECT_EQ(store->prunePeers(10, 4, {"10.0.0.1:8333"}, 2000), 7, "pruned");
+    std::vector<std::string> left;
+    for (const auto& p : store->peers()) left.push_back(p.host);
+    std::sort(left.begin(), left.end());
+    EXPECT((left == std::vector<std::string>{"10.0.0.0", "10.0.0.1", "10.0.0.10", "10.0.0.9"}), "the most valuable and the spared");
+    store->close();
+}
+
+void StoreTests::peerTimesMigration() {
+    // A database made before the peer times were stored gains the columns,
+    // its peers counted as added when it is opened.
+    TempDir dir;
+    std::string path = dir.file("old.db");
+    {
+        SQLiteDatabase db(path);
+        db.execute("create table peers (host text not null, port integer not null, services integer not null default 0, "
+                   "latencyMs integer not null default 0, okCount integer not null default 0, failCount integer not null default 0, "
+                   "primary key (host, port));"
+                   "insert into peers (host, port, okCount) values ('1.2.3.4', 8333, 3);");
+        db.close();
+    }
+    int64_t before = Store::unixNow();
+    auto store = Store::open(path);
+    auto peers = store->peers();
+    QVERIFY(peers.size() == 1);
+    EXPECT(peers[0].okCount == 3 && peers[0].connectedAt == 0 && peers[0].failedAt == 0, "counts kept");
+    EXPECT(peers[0].addedAt >= before, "added when opened");
+    store->close();
+    store = Store::open(path);
+    EXPECT_EQ(store->peers()[0].addedAt, peers[0].addedAt, "migrated once");
     store->close();
 }
 
