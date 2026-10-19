@@ -11,6 +11,8 @@
 
 #ifdef _WIN32
 #include "test_windows.h"
+#elif defined(__APPLE__)
+#include "test_macos.h"
 #endif
 
 // Runs every suite, or the ones named on the command line before the QtTest
@@ -28,6 +30,8 @@ int main(int argc, char** argv) {
     suites.push_back(std::make_unique<tb::test::AppTests>());
 #ifdef _WIN32
     suites.push_back(std::make_unique<tb::test::WindowsTests>());
+#elif defined(__APPLE__)
+    suites.push_back(std::make_unique<tb::test::MacTests>());
 #endif
 
     std::vector<char*> args{argv[0]};

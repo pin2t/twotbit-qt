@@ -1,10 +1,11 @@
-# Twotbit for Windows
+# Twotbit for Windows and macOS
 
-A native Windows SPV Bitcoin wallet in C++ and Qt: BIP84 keys, a fully
-validated block header chain, BIP157/158 compact block filters and a small
-pool of P2P peers, reached directly.
+A native Windows and macOS SPV Bitcoin wallet in C++ and Qt: BIP84 keys, a
+fully validated block header chain, BIP157/158 compact block filters and a
+small pool of P2P peers, reached directly.
 
-It is the [macOS app](../macos) rebuilt for Windows. Its wallet engine is a
+It is the [Swift macOS app](../macos) rebuilt in Qt, for Windows first and
+for the Mac too. Its wallet engine is a
 C++20 port of the Swift TwotbitKit, checked against the same bitfyn and btcd
 vectors. The Qt Widgets window follows the SwiftUI one page by page. Tor and
 I2P are not ported: peers are always dialed directly.
@@ -43,14 +44,16 @@ I2P are not ported: peers are always dialed directly.
 
 ## Build and run
 
+The build takes the files it shares with the Swift macOS app from
+`../macos` (or `../twotbit-macos`): libsecp256k1, the rate history, the test
+vectors and the icon images. Keep both directories side by side, or point
+`-DTWOTBIT_MACOS_DIR` at the Swift app's one.
+
+### Windows
+
 Requires Windows 10 or 11 and Qt 6.8 or later for MinGW, with CMake 3.21
 or later and Ninja. The Qt online installer provides all of them; the app
 was developed with Qt 6.12.0 and MinGW 13.1.
-
-The build takes the files it shares with the macOS app from `../macos`:
-libsecp256k1, the rate history, the test vectors and the icon images. Keep
-both directories side by side, or point `-DTWOTBIT_MACOS_DIR` at the macOS
-one.
 
 In a Command Prompt, with the paths of your Qt installation:
 
@@ -87,6 +90,49 @@ Switching the network in Settings relaunches the app on the new network,
 keeping a `-datadir` given on the command line. Only one Twotbit opens a
 wallet at a time. A second one started on the same network and data folder
 says that the wallet is already open and does not start.
+
+### macOS
+
+Requires macOS 13 or later with Xcode or its command line tools, and Qt 6.8
+or later for macOS with CMake 3.21 or later and Ninja. The Qt online
+installer provides Qt, CMake and Ninja; the app was built with Qt 6.12.0.
+In Terminal, with the paths of your Qt installation:
+
+```sh
+export PATH="$HOME/Qt/Tools/Ninja:$HOME/Qt/Tools/CMake/CMake.app/Contents/bin:$PATH"
+cmake -S . -B build -G Ninja -DCMAKE_PREFIX_PATH=$HOME/Qt/6.12.0/macos
+cmake --build build
+open build/common/app/Twotbit.app --args -net signet
+```
+
+The build makes `Twotbit.app`, its icon packed from the Swift app's images.
+`cmake --build build --target deploy` copies the Qt frameworks and plugins
+into it with macdeployqt, signs it ad hoc and puts it, with a
+`Twotbit.dmg` of it, in `build/deploy`. A Mac that did not build it opens
+it with a right click and Open the first time, as it is not notarized.
+
+On the Mac the options are read the same way, with these defaults and
+places:
+
+| | macOS |
+|---|---|
+| data folder | `~/Library/Application Support/Twotbit`, the Swift app's own |
+| saved options | the user defaults `com.pin2t.Twotbit`: `defaults write com.pin2t.Twotbit net signet` |
+| recovery phrase | the login keychain, as the generic password of service `com.pin2t.twotbit` and the account public key, as the Swift app keeps it |
+| before the phrase is shown | Touch ID, or the account password |
+| log | `twotbit.log` in the data folder; `TWOTBIT_LOG_STDERR=1` echoes it to Terminal |
+
+The data folder, the database schema and the keychain item are the Swift
+app's, so both open the same wallet. Do not run both at once on the same
+network: each would sync the one database. The first time the Qt app reads
+a phrase the Swift app stored, macOS asks to allow it access to the
+keychain item.
+
+Settings and Quit are in the Twotbit menu, and the shortcuts use Command:
+⌘, for Settings, ⇧⌘R for Receive, ⇧⌘S for Send and ⇧⌘C to copy the
+address. The icons are the SF Symbols the Swift app shows. Buttons, fields
+and focus rings take the accent color set in System Settings, as Mac apps
+do.
 
 ### The recovery phrase and the Credential Manager
 
@@ -152,6 +198,13 @@ common/                 what every platform builds
     rates, format       BTC/USD rates; amounts, times, statistics, QR codes
   app/                  the Qt Widgets app: AppModel (the GUI logic), the views
                         and dialogs, the theme
+macos/                  what is the Mac's own, added to the common targets
+  core/p2p/tcp.cpp      TCP and DNS over BSD sockets
+  core/storage          the keychain secret store
+  app/                  Touch ID or the password before the phrase is shown,
+                        the SF Symbols of the icons
+    resources           the bundle's Info.plist
+  tests/                the keychain suite, the mock nodes' listeners
 windows/                what is Windows' own, added to the common targets
   core/p2p/tcp.cpp      TCP and DNS over Winsock
   core/storage          the Credential Manager secret store
@@ -182,6 +235,11 @@ third_party/sqlite      SQLite 3.53.4, the amalgamation
   rescans and pinned peers.
 - the app's model opening, syncing and paying from a wallet against a mock
   node.
+
+On the Mac, `ctest --test-dir build` runs the same tests and the keychain
+suite in about three seconds; `TWOTBIT_SKIP_KEYCHAIN=1` skips the keychain
+one where there is no unlocked login keychain. `build/tests/twotbit_tests`
+takes the same arguments as on Windows.
 
 `build\twotbit_tests.exe` takes the suites to run first, then QtTest's
 options, such as `build\twotbit_tests.exe SyncTests fullSync`. QtTest's

@@ -22,7 +22,10 @@ add_executable(twotbit_tests
 )
 target_include_directories(twotbit_tests PRIVATE "${CMAKE_CURRENT_SOURCE_DIR}" "${app}")
 target_compile_definitions(twotbit_tests PRIVATE TWOTBIT_FIXTURES_DIR="${TWOTBIT_FIXTURES_DIR}")
-target_compile_options(twotbit_tests PRIVATE -Wall -Wextra -Wno-missing-field-initializers -Wno-dangling-reference)
+target_compile_options(twotbit_tests PRIVATE -Wall -Wextra -Wno-missing-field-initializers)
+if(CMAKE_CXX_COMPILER_ID STREQUAL "GNU")
+    target_compile_options(twotbit_tests PRIVATE -Wno-dangling-reference)
+endif()
 target_link_libraries(twotbit_tests PRIVATE twotbit_core Qt6::Gui Qt6::Widgets Qt6::Test)
 
 # The platform's directory adds its own suites and the local sockets the
@@ -35,6 +38,13 @@ if(WIN32)
     )
     target_include_directories(twotbit_tests PRIVATE "${windows}")
     target_link_libraries(twotbit_tests PRIVATE twotbit_windows ws2_32)
+elseif(APPLE)
+    set(macos "${CMAKE_SOURCE_DIR}/macos/tests")
+    target_sources(twotbit_tests PRIVATE
+        "${macos}/sockets.cpp"
+        "${macos}/test_macos.cpp" "${macos}/test_macos.h"
+    )
+    target_include_directories(twotbit_tests PRIVATE "${macos}")
 endif()
 
 # QtTest's plain text logger writes nothing to a redirected stdout on Windows;

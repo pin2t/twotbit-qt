@@ -101,7 +101,11 @@ SettingsView::SettingsView(AppModel& model, QWidget* parent)
     folderLayout->setContentsMargins(0, 0, 0, 0);
     folder_->setTextInteractionFlags(Qt::TextSelectableByMouse);
     folderLayout->addWidget(folder_, 1);
+#ifdef Q_OS_MACOS
+    auto* explorer = new QPushButton("Show in Finder");
+#else
     auto* explorer = new QPushButton("Show in Explorer");
+#endif
     folderLayout->addWidget(explorer);
     addRow(row("Data folder", folderBox), false);
 
@@ -130,7 +134,11 @@ SettingsView::SettingsView(AppModel& model, QWidget* parent)
     connect(&model, &AppModel::peerChanged, this, &SettingsView::refreshPeer);
     connect(network_, &QComboBox::activated, this, &SettingsView::networkPicked);
     connect(explorer, &QPushButton::clicked, this, [this] {
+#ifdef Q_OS_MACOS
+        QProcess::startDetached("/usr/bin/open", {"-R", model_.options().dataDirectory});
+#else
         QProcess::startDetached("explorer.exe", {"/select,", QDir::toNativeSeparators(model_.options().dataDirectory)});
+#endif
     });
     connect(copy, &QToolButton::clicked, this, [this] { model_.copy(model_.accountXPub(), "Account public key"); });
     connect(show, &QPushButton::clicked, this, &SettingsView::reveal);

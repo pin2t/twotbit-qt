@@ -6,6 +6,8 @@
 #ifdef _WIN32
 #include <windows.h>
 #include <bcrypt.h>
+#elif defined(__APPLE__)
+#include <stdlib.h>
 #else
 #include <random>
 #endif
@@ -291,6 +293,8 @@ Bytes randomBytes(size_t count) {
 #ifdef _WIN32
     if (BCryptGenRandom(nullptr, out.data(), ULONG(count), BCRYPT_USE_SYSTEM_PREFERRED_RNG) != 0)
         throw std::runtime_error("no secure random bytes");
+#elif defined(__APPLE__)
+    arc4random_buf(out.data(), count);
 #else
     std::random_device device;
     for (auto& b : out) b = uint8_t(device());

@@ -14,6 +14,7 @@
 #include "receivedialog.h"
 #include "senddialog.h"
 #include "settingsview.h"
+#include "storage/secrets.h"
 #include "transactionsview.h"
 
 namespace {
@@ -61,8 +62,9 @@ RestoreView::RestoreView(AppModel& model, QWidget* parent)
     title->setFont(Theme::font(1.45, QFont::Bold));
     title->setAlignment(Qt::AlignCenter);
     layout->addWidget(title);
-    auto* description = label("The wallet's recovery phrase is not in the Windows Credential Manager any more. Enter its 12 words to restore access "
-                              "to this wallet.",
+    auto* description = label(QString("The wallet's recovery phrase is not in the %1 any more. Enter its 12 words to restore access "
+                                      "to this wallet.")
+                                  .arg(tb::CredentialSecretStore::storeName()),
                               Theme::Tone::secondary);
     description->setWordWrap(true);
     description->setAlignment(Qt::AlignCenter);
@@ -130,13 +132,26 @@ MainWindow::MainWindow(AppModel& model, QWidget* parent)
 }
 
 void MainWindow::buildMenus() {
+    // On the Mac, Settings and Quit move to the application menu, which
+    // leaves no File menu.
+#ifdef Q_OS_MACOS
+    QMenu* wallet = menuBar()->addMenu("&Wallet");
+    QMenu* file = wallet;
+#else
     QMenu* file = menuBar()->addMenu("&File");
+#endif
     QAction* settings = file->addAction("&Settings…", this, [this] { model_.select(AppModel::Section::settings); });
     settings->setShortcut(QKeySequence("Ctrl+,"));
+    settings->setMenuRole(QAction::PreferencesRole);
+#ifndef Q_OS_MACOS
     file->addSeparator();
+#endif
     QAction* exit = file->addAction("E&xit", this, &QWidget::close);
     exit->setShortcut(QKeySequence::Quit);
+    exit->setMenuRole(QAction::QuitRole);
+#ifndef Q_OS_MACOS
     QMenu* wallet = menuBar()->addMenu("&Wallet");
+#endif
     QAction* receive = wallet->addAction("&Receive…", this, [this] { model_.openReceive(); });
     receive->setShortcut(QKeySequence("Ctrl+Shift+R"));
     QAction* send = wallet->addAction("&Send…", this, [this] { model_.openSend(); });
@@ -148,12 +163,13 @@ void MainWindow::buildMenus() {
     connect(&model_, &AppModel::addressChanged, this, [this] { copyAddress_->setEnabled(!model_.address().isEmpty()); });
     copyAddress_->setEnabled(false);
     QMenu* help = menuBar()->addMenu("&Help");
-    help->addAction("&About Twotbit", this, [this] {
+    QAction* about = help->addAction("&About Twotbit", this, [this] {
         QMessageBox::about(this, "About Twotbit",
                            "<b>Twotbit " + QApplication::applicationVersion() +
                                "</b><p>An SPV Bitcoin wallet: BIP84 keys, a validated header chain, BIP157/158 compact block filters and a "
                                "small pool of peers.</p><p>Copyright © 2026 Ilya Pokolev. MIT License.</p>");
     });
+    about->setMenuRole(QAction::AboutRole);
 }
 
 void MainWindow::buildReady() {

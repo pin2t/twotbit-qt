@@ -52,7 +52,8 @@ std::string string(ByteView raw);
 /// directly only, so it never dials those.
 bool isOverlayHost(const std::string& host);
 
-/// Starts Windows Sockets once for the process, before any socket call.
+/// Starts Windows Sockets once for the process, before any socket call. The
+/// Mac's BSD sockets need no start.
 void ensureSockets();
 
 } // namespace tb

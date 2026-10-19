@@ -60,7 +60,7 @@ struct Network {
     bool checksDifficulty() const { return kind != Kind::regtest && kind != Kind::simnet; }
 
     /// Whether the wallet's recovery phrase is kept in the Windows
-    /// Credential Manager. The local test networks keep it in their
+    /// Credential Manager or the Keychain. The local test networks keep it in their
     /// database instead: their coins have no value.
     bool keepsPhraseInCredentials() const { return kind != Kind::regtest && kind != Kind::simnet; }
 

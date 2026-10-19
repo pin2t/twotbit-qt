@@ -15,7 +15,7 @@ namespace tb {
 
 /// WalletMeta is the single wallet metadata row: the network, the account
 /// xpub, when the wallet was created and the next receive index. The
-/// recovery phrase lives in the Windows Credential Manager; the mnemonic
+/// recovery phrase lives in the Windows Credential Manager or the Keychain; the mnemonic
 /// column holds it only for the local test networks and in a database
 /// brought over from bitfyn, until it is moved there.
 struct WalletMeta {

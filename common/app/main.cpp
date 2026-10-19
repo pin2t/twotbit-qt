@@ -20,7 +20,8 @@ int main(int argc, char* argv[]) {
     QApplication::setOrganizationName("pin2t");
     QApplication::setOrganizationDomain("pin2t.com");
     QApplication app(argc, argv);
-    // The Windows 11 look, light and dark, on Windows 10 too.
+    // The Windows 11 look, light and dark, on Windows 10 too. The Mac keeps
+    // its own.
     if (QStyleFactory::keys().contains("windows11", Qt::CaseInsensitive)) QApplication::setStyle("windows11");
     QIcon icon;
     for (int size : {16, 32, 64, 128, 256, 512}) icon.addFile(QString(":/icons/icon_%1.png").arg(size), QSize(size, size));

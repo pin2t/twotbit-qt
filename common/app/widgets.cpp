@@ -140,16 +140,28 @@ CopyButton::CopyButton(const QString& help, QWidget* parent) : QToolButton(paren
 
 void CopyButton::refreshIcon() { Theme::setGlyphIcon(this, Glyph::copy, 14, Theme::Tone::secondary); }
 
-GlyphLabel::GlyphLabel(Glyph glyph, int pixelSize, Theme::Tone tone, QWidget* parent) : QLabel(parent) {
-    QFont f(Theme::iconFamily());
-    f.setPixelSize(pixelSize);
-    setFont(f);
-    setAlignment(Qt::AlignCenter);
-    setGlyph(glyph);
+GlyphLabel::GlyphLabel(Glyph glyph, int pixelSize, Theme::Tone tone, QWidget* parent) : QLabel(parent), glyph_(glyph), pixelSize_(pixelSize) {
+    setSizePolicy(QSizePolicy::Fixed, QSizePolicy::Fixed);
     Theme::setTone(this, tone);
 }
 
-void GlyphLabel::setGlyph(Glyph glyph) { setText(QString(Theme::glyph(glyph))); }
+void GlyphLabel::setGlyph(Glyph glyph) {
+    glyph_ = glyph;
+    update();
+}
+
+QSize GlyphLabel::sizeHint() const { return {pixelSize_, pixelSize_}; }
+
+QSize GlyphLabel::minimumSizeHint() const { return sizeHint(); }
+
+// The glyph in the window text color, which the tone sets.
+void GlyphLabel::paintEvent(QPaintEvent*) {
+    QPainter p(this);
+    QPixmap pixmap = Theme::glyphPixmap(glyph_, palette().color(QPalette::WindowText), pixelSize_, devicePixelRatioF());
+    QRect box(QPoint(0, 0), QSize(pixelSize_, pixelSize_));
+    box.moveCenter(rect().center());
+    p.drawPixmap(box.topLeft(), pixmap);
+}
 
 SortControl::SortControl(const QString& title, QWidget* parent) : QWidget(parent), title_(title) {
     setCursor(Qt::PointingHandCursor);

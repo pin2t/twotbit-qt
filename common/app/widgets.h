@@ -113,6 +113,15 @@ class GlyphLabel : public QLabel {
 public:
     GlyphLabel(Glyph glyph, int pixelSize, Theme::Tone tone = Theme::Tone::secondary, QWidget* parent = nullptr);
     void setGlyph(Glyph glyph);
+    QSize sizeHint() const override;
+    QSize minimumSizeHint() const override;
+
+protected:
+    void paintEvent(QPaintEvent* event) override;
+
+private:
+    Glyph glyph_;
+    int pixelSize_;
 };
 
 /// SortControl is a pair of small arrows, up for ascending over down for

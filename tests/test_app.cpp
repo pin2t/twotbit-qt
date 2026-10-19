@@ -33,11 +33,22 @@ bool waitFor(int ms, const std::function<bool()>& condition) {
 } // namespace
 
 void AppTests::launchOptions() {
-    LaunchOptions o = LaunchOptions::load({"twotbit", "-net", "signet", "-datadir", "C:\\wallets\\x", "-peer", " 1.2.3.4:38333 "});
+#ifdef _WIN32
+    const QString dataDirectory = "C:\\wallets\\x";
+#else
+    const QString dataDirectory = "/wallets/x";
+#endif
+    LaunchOptions o = LaunchOptions::load({"twotbit", "-net", "signet", "-datadir", dataDirectory, "-peer", " 1.2.3.4:38333 "});
     EXPECT(*o.network == Network::signet(), "network");
-    EXPECT_EQ(QDir::toNativeSeparators(o.dataDirectory).toStdString(), std::string("C:\\wallets\\x"), "data directory");
+    EXPECT_EQ(QDir::toNativeSeparators(o.dataDirectory).toStdString(), dataDirectory.toStdString(), "data directory");
     EXPECT_EQ(o.peer.toStdString(), std::string("1.2.3.4:38333"), "peer");
-    EXPECT((o.relaunchArguments() == QStringList{"-datadir", "C:\\wallets\\x"}), "relaunch keeps the data directory");
+    EXPECT((o.relaunchArguments() == QStringList{"-datadir", dataDirectory}), "relaunch keeps the data directory");
+    o = LaunchOptions::load({"twotbit", "-datadir", "~/wallets"});
+    EXPECT_EQ(o.dataDirectory.toStdString(), QDir(QDir::homePath()).filePath("wallets").toStdString(), "~ is the home directory");
+#ifdef __APPLE__
+    EXPECT_EQ(LaunchOptions::defaultDataDirectory().toStdString(), (QDir::homePath() + "/Library/Application Support/Twotbit").toStdString(),
+              "the data directory is in Application Support, as the Swift app's");
+#endif
     o = LaunchOptions::load({"twotbit", "--net=testnet4", "-snapshot", "shots"});
     EXPECT(*o.network == Network::testnet4(), "--net=");
     EXPECT_EQ(o.snapshot.toStdString(), std::string("shots"), "snapshot");

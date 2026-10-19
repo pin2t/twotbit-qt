@@ -28,18 +28,25 @@ public:
     unsigned long code;
 };
 
-/// CredentialSecretStore keeps secrets as generic credentials of the Windows
-/// Credential Manager: encrypted for the signed-in user by Windows and kept
-/// on this computer only.
+/// CredentialSecretStore keeps secrets in the platform's store of the
+/// signed-in user's credentials, kept on this computer only: generic
+/// credentials of the Windows Credential Manager (windows/core/storage), or
+/// generic passwords of the macOS login keychain (macos/core/storage).
 class CredentialSecretStore : public SecretStore {
 public:
     explicit CredentialSecretStore(std::string service) : service_(std::move(service)) {}
+
+    /// The name of the platform's credential store, as messages show it:
+    /// "Windows Credential Manager" or "Keychain".
+    static const char* storeName();
 
     std::optional<std::string> secret(const std::string& account) override;
     void setSecret(const std::string& secret, const std::string& account, const std::string& label) override;
     void deleteSecret(const std::string& account) override;
 
-    /// The target name a secret of the account is stored under.
+    /// The target name a secret of the account is stored under in the
+    /// Credential Manager. The Keychain keeps the service and the account
+    /// apart.
     std::string target(const std::string& account) const { return service_ + ":" + account; }
 
 private:
@@ -67,7 +74,7 @@ public:
         return {Kind::wrongNetwork, "wallet database is for network \"" + stored + "\", not \"" + requested + "\""};
     }
     static WalletError missingRecoveryPhrase() {
-        return {Kind::missingRecoveryPhrase, "the wallet's recovery phrase is not in the Windows Credential Manager"};
+        return {Kind::missingRecoveryPhrase, std::string("the wallet's recovery phrase is not in the ") + CredentialSecretStore::storeName()};
     }
     static WalletError recoveryPhraseMismatch() { return {Kind::recoveryPhraseMismatch, "the recovery phrase belongs to another wallet"}; }
 

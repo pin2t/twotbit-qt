@@ -38,6 +38,8 @@ CredentialError credentialError(DWORD code) {
 
 } // namespace
 
+const char* CredentialSecretStore::storeName() { return "Windows Credential Manager"; }
+
 std::optional<std::string> CredentialSecretStore::secret(const std::string& account) {
     PCREDENTIALW credential = nullptr;
     if (!CredReadW(wide(target(account)).c_str(), CRED_TYPE_GENERIC, 0, &credential)) {

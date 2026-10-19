@@ -21,7 +21,8 @@ public:
 
     NetError(Kind kind, const std::string& what) : Error(what), kind(kind) {}
 
-    /// The error of a Windows Sockets error code.
+    /// The error of the platform's socket error code: a Windows Sockets
+    /// one, or an errno on the Mac.
     static NetError fromCode(int code);
 
     Kind kind;

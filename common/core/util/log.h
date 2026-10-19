@@ -17,8 +17,8 @@ inline std::string utf8Of(const std::filesystem::path& path) {
 }
 
 /// Log records what the wallet does, as bitfyn's log.Printf lines: to the
-/// debugger output, where DebugView shows it, and to twotbit.log in the data
-/// directory once a file is set.
+/// debugger output on Windows, where DebugView shows it, and to twotbit.log
+/// in the data directory once a file is set.
 namespace Log {
 
 /// Appends the log from now on to the file, setting an old one aside as

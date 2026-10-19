@@ -47,7 +47,7 @@ public:
     /// to the typed peer, so typing does not dial every partial address.
     static constexpr int peerCheckDelayMs = 700;
     /// The service name the recovery phrases are kept under in the Windows
-    /// Credential Manager.
+    /// Credential Manager, and in the Keychain as the Swift app keeps them.
     static constexpr const char* credentialService = "com.pin2t.twotbit";
 
     explicit AppModel(LaunchOptions options, QObject* parent = nullptr);
@@ -93,7 +93,7 @@ public:
     /// the database.
     void shutdown();
 
-    /// Restores the recovery phrase the Credential Manager lost, then opens
+    /// Restores the recovery phrase the credential store lost, then opens
     /// the wallet. It throws when the phrase does not fit the wallet.
     void restore(const QString& phrase);
 

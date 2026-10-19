@@ -63,7 +63,7 @@ OpenedWallet open(std::shared_ptr<Store> store, const Network& network, SecretSt
         if (!credentials) return OpenedWallet{store, wallet, *meta};
         secrets.setSecret(meta->mnemonic, meta->xpub, label(network));
         store->setMnemonic("");
-        Log::info("wallet recovery phrase moved from the database to the Credential Manager");
+        Log::info(std::string("wallet recovery phrase moved from the database to the ") + CredentialSecretStore::storeName());
         return OpenedWallet{store, wallet, *store->meta()};
     }
     auto mnemonic = secrets.secret(meta->xpub);

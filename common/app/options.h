@@ -8,8 +8,9 @@
 /// LaunchOptions are the command line options, as bitfyn's flags: -net,
 /// -datadir and -peer, each also read from the saved settings, where -net
 /// also persists the network chosen in the settings: the registry key
-/// HKEY_CURRENT_USER\Software\pin2t\Twotbit. -snapshot saves the window's
-/// sections as images and quits.
+/// HKEY_CURRENT_USER\Software\pin2t\Twotbit on Windows, the user defaults
+/// com.pin2t.Twotbit on the Mac. -snapshot saves the window's sections as
+/// images and quits.
 struct LaunchOptions {
     const tb::Network* network = &tb::Network::mainnet();
     QString dataDirectory;
@@ -22,7 +23,8 @@ struct LaunchOptions {
     static LaunchOptions load(const QStringList& arguments);
 
     /// The default data directory: Twotbit in the local application data
-    /// folder.
+    /// folder, %LOCALAPPDATA% on Windows and ~/Library/Application Support
+    /// on the Mac.
     static QString defaultDataDirectory();
 
     /// The arguments to relaunch the app with on another network: the data

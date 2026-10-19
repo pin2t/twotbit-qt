@@ -6,7 +6,8 @@
 namespace tb::test {
 
 /// The listening sockets of the tests' local peers, as the platform makes
-/// them: windows/tests/sockets.cpp on Windows.
+/// them: windows/tests/sockets.cpp on Windows, macos/tests/sockets.cpp on
+/// the Mac.
 namespace Sockets {
 
 /// A socket listening on a free port of the loopback address.

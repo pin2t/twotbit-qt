@@ -19,7 +19,7 @@ class SettingsView;
 class TransactionsView;
 
 /// RestoreView asks for the recovery phrase of a wallet whose phrase is no
-/// longer in the Credential Manager.
+/// longer in the Credential Manager or the Keychain.
 class RestoreView : public QWidget {
     Q_OBJECT
 public:

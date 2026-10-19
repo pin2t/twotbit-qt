@@ -61,8 +61,11 @@ QColor danger() { return dark() ? QColor(0xff, 0x99, 0xa4) : QColor(0xc4, 0x2b, 
 
 QFont mono(double scale) {
     static const QString family = [] {
+#ifndef Q_OS_MACOS
         for (const char* f : {"Cascadia Mono", "Consolas", "Courier New"})
             if (QFontDatabase::hasFamily(f)) return QString(f);
+#endif
+        // The Mac's system monospaced font, SF Mono.
         return QFontDatabase::systemFont(QFontDatabase::FixedFont).family();
     }();
     QFont f(family);
@@ -105,23 +108,64 @@ QChar glyph(Glyph g) {
     return QChar(' ');
 }
 
+#ifdef Q_OS_MACOS
+QString symbolName(Glyph g) {
+    switch (g) {
+    case Glyph::home: return "house";
+    case Glyph::coins: return "circle.circle";
+    case Glyph::transactions: return "clock.arrow.circlepath";
+    case Glyph::settings: return "gearshape";
+    case Glyph::copy: return "doc.on.doc";
+    case Glyph::receive: return "arrow.down.to.line";
+    case Glyph::send: return "arrow.up.to.line";
+    case Glyph::merge: return "arrow.triangle.merge";
+    case Glyph::split: return "arrow.triangle.branch";
+    case Glyph::arrowRight: return "arrow.right";
+    case Glyph::warning: return "exclamationmark.triangle";
+    case Glyph::warningFilled: return "exclamationmark.triangle.fill";
+    case Glyph::checkFilled: return "checkmark.circle.fill";
+    case Glyph::key: return "key.slash";
+    case Glyph::sortUp: return "arrowtriangle.up.fill";
+    case Glyph::sortDown: return "arrowtriangle.down.fill";
+    }
+    return {};
+}
+#endif
+
+QPixmap glyphPixmap(Glyph g, const QColor& color, int size, double ratio) {
+    int pixels = int(size * ratio + 0.5);
+    QColor ink = color.isValid() ? color : QApplication::palette().color(QPalette::WindowText);
+#ifdef Q_OS_MACOS
+    // The symbol's shape, in the color.
+    QImage image = symbol(symbolName(g), pixels);
+    if (image.isNull()) {
+        image = QImage(pixels, pixels, QImage::Format_ARGB32_Premultiplied);
+        image.fill(Qt::transparent);
+    }
+    QPainter p(&image);
+    p.setCompositionMode(QPainter::CompositionMode_SourceIn);
+    p.fillRect(image.rect(), ink);
+    p.end();
+    QPixmap pixmap = QPixmap::fromImage(image);
+#else
+    QPixmap pixmap(pixels, pixels);
+    pixmap.fill(Qt::transparent);
+    QPainter p(&pixmap);
+    p.setRenderHint(QPainter::TextAntialiasing);
+    QFont f(iconFamily());
+    f.setPixelSize(pixels);
+    p.setFont(f);
+    p.setPen(ink);
+    p.drawText(QRect(0, 0, pixels, pixels), Qt::AlignCenter, QString(glyph(g)));
+    p.end();
+#endif
+    pixmap.setDevicePixelRatio(ratio);
+    return pixmap;
+}
+
 QIcon icon(Glyph g, const QColor& color, int size) {
     QIcon result;
-    for (double ratio : {1.0, 1.25, 1.5, 2.0}) {
-        int pixels = int(size * ratio + 0.5);
-        QPixmap pixmap(pixels, pixels);
-        pixmap.fill(Qt::transparent);
-        QPainter p(&pixmap);
-        p.setRenderHint(QPainter::TextAntialiasing);
-        QFont f(iconFamily());
-        f.setPixelSize(pixels);
-        p.setFont(f);
-        p.setPen(color.isValid() ? color : QApplication::palette().color(QPalette::WindowText));
-        p.drawText(QRect(0, 0, pixels, pixels), Qt::AlignCenter, QString(glyph(g)));
-        p.end();
-        pixmap.setDevicePixelRatio(ratio);
-        result.addPixmap(pixmap);
-    }
+    for (double ratio : {1.0, 1.25, 1.5, 2.0}) result.addPixmap(glyphPixmap(g, color, size, ratio));
     return result;
 }
 
