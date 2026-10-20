@@ -4,6 +4,7 @@
 #include <QApplication>
 #include <QFontDatabase>
 #include <QFontMetricsF>
+#include <QIcon>
 #include <QPainter>
 #include <QPixmap>
 #include <QStyleHints>
@@ -26,7 +27,7 @@ void applyAccent(QApplication& app) {
     app.setPalette(palette);
 }
 
-#ifdef Q_OS_MACOS
+#if defined(Q_OS_MACOS) || defined(Q_OS_LINUX)
 /// Paints the image's shape over in the color.
 void tint(QImage& image, const QColor& color) {
     QPainter p(&image);
@@ -43,6 +44,10 @@ QColor mix(const QColor& base, const QColor& over, double amount) {
 } // namespace
 
 void install(QApplication& app) {
+#ifdef Q_OS_LINUX
+    // The symbolic icons a theme lacks are taken from GNOME's own.
+    QIcon::setFallbackThemeName("Adwaita");
+#endif
     applyAccent(app);
     QObject::connect(app.styleHints(), &QStyleHints::colorSchemeChanged, &app, [&app] {
         // The style updates the palette for the new scheme first.
@@ -73,11 +78,12 @@ QColor danger() { return dark() ? QColor(0xff, 0x99, 0xa4) : QColor(0xc4, 0x2b, 
 
 QFont mono(double scale) {
     static const QString family = [] {
-#ifndef Q_OS_MACOS
+#ifdef Q_OS_WIN
         for (const char* f : {"Cascadia Mono", "Consolas", "Courier New"})
             if (QFontDatabase::hasFamily(f)) return QString(f);
 #endif
-        // The Mac's system monospaced font, SF Mono.
+        // The system monospaced font: SF Mono on the Mac, the desktop's
+        // monospace font on Linux.
         return QFontDatabase::systemFont(QFontDatabase::FixedFont).family();
     }();
     QFont f(family);
@@ -142,6 +148,28 @@ QString symbolName(Glyph g) {
     }
     return {};
 }
+#elif defined(Q_OS_LINUX)
+QStringList iconNames(Glyph g) {
+    switch (g) {
+    case Glyph::home: return {"go-home-symbolic", "user-home-symbolic"};
+    case Glyph::coins: return {"money-symbolic", "view-grid-symbolic"};
+    case Glyph::transactions: return {"document-open-recent-symbolic"};
+    case Glyph::settings: return {"emblem-system-symbolic", "preferences-system-symbolic"};
+    case Glyph::copy: return {"edit-copy-symbolic"};
+    case Glyph::receive: return {"go-bottom-symbolic", "go-down-symbolic"};
+    case Glyph::send: return {"go-top-symbolic", "go-up-symbolic"};
+    case Glyph::merge: return {"object-merge-symbolic", "media-playlist-consecutive-symbolic"};
+    case Glyph::split: return {"object-split-symbolic", "media-playlist-shuffle-symbolic"};
+    case Glyph::arrowRight: return {"go-next-symbolic"};
+    case Glyph::warning: return {"dialog-warning-symbolic"};
+    case Glyph::warningFilled: return {"dialog-warning-symbolic"};
+    case Glyph::checkFilled: return {"emblem-ok-symbolic", "emblem-default-symbolic"};
+    case Glyph::key: return {"dialog-password-symbolic", "channel-insecure-symbolic"};
+    case Glyph::sortUp: return {"pan-up-symbolic"};
+    case Glyph::sortDown: return {"pan-down-symbolic"};
+    }
+    return {};
+}
 #endif
 
 QPixmap glyphPixmap(Glyph g, const QColor& color, int size, double ratio) {
@@ -153,6 +181,20 @@ QPixmap glyphPixmap(Glyph g, const QColor& color, int size, double ratio) {
     if (image.isNull()) {
         image = QImage(pixels, pixels, QImage::Format_ARGB32_Premultiplied);
         image.fill(Qt::transparent);
+    }
+    tint(image, ink);
+    QPixmap pixmap = QPixmap::fromImage(image);
+#elif defined(Q_OS_LINUX)
+    // The theme's symbolic icon, centered, in the color.
+    QImage image(pixels, pixels, QImage::Format_ARGB32_Premultiplied);
+    image.fill(Qt::transparent);
+    for (const QString& name : iconNames(g)) {
+        QIcon themed = QIcon::fromTheme(name);
+        if (themed.isNull()) continue;
+        QPixmap drawn = themed.pixmap(QSize(pixels, pixels), 1.0);
+        QPainter p(&image);
+        p.drawPixmap((pixels - drawn.width()) / 2, (pixels - drawn.height()) / 2, drawn);
+        break;
     }
     tint(image, ink);
     QPixmap pixmap = QPixmap::fromImage(image);

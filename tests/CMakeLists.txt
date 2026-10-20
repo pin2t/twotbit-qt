@@ -45,6 +45,13 @@ elseif(APPLE)
         "${macos}/test_macos.cpp" "${macos}/test_macos.h"
     )
     target_include_directories(twotbit_tests PRIVATE "${macos}")
+elseif(CMAKE_SYSTEM_NAME STREQUAL "Linux")
+    set(linux "${CMAKE_SOURCE_DIR}/linux/tests")
+    target_sources(twotbit_tests PRIVATE
+        "${linux}/sockets.cpp"
+        "${linux}/test_linux.cpp" "${linux}/test_linux.h"
+    )
+    target_include_directories(twotbit_tests PRIVATE "${linux}")
 endif()
 
 # QtTest's plain text logger writes nothing to a redirected stdout on Windows;

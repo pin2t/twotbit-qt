@@ -1,0 +1,20 @@
+<?xml version="1.0" encoding="UTF-8"?>
+<!DOCTYPE policyconfig PUBLIC "-//freedesktop//DTD PolicyKit Policy Configuration 1.0//EN"
+ "http://www.freedesktop.org/standards/PolicyKit/1/policyconfig.dtd">
+<!-- The owner check before Twotbit shows the wallet's recovery phrase: the
+     signed-in user's own password, every time. polkit reads it from
+     /usr/share/polkit-1/actions. -->
+<policyconfig>
+  <vendor>pin2t</vendor>
+  <vendor_url>https://github.com/pin2t/twotbit-qt</vendor_url>
+  <icon_name>com.pin2t.Twotbit</icon_name>
+  <action id="com.pin2t.twotbit.show-recovery-phrase">
+    <description>Show the wallet's recovery phrase</description>
+    <message>Twotbit wants to show the wallet's recovery phrase.</message>
+    <defaults>
+      <allow_any>auth_self</allow_any>
+      <allow_inactive>auth_self</allow_inactive>
+      <allow_active>auth_self</allow_active>
+    </defaults>
+  </action>
+</policyconfig>

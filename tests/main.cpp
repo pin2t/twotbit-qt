@@ -13,6 +13,8 @@
 #include "test_windows.h"
 #elif defined(__APPLE__)
 #include "test_macos.h"
+#elif defined(__linux__)
+#include "test_linux.h"
 #endif
 
 // Runs every suite, or the ones named on the command line before the QtTest
@@ -32,6 +34,8 @@ int main(int argc, char** argv) {
     suites.push_back(std::make_unique<tb::test::WindowsTests>());
 #elif defined(__APPLE__)
     suites.push_back(std::make_unique<tb::test::MacTests>());
+#elif defined(__linux__)
+    suites.push_back(std::make_unique<tb::test::LinuxTests>());
 #endif
 
     std::vector<char*> args{argv[0]};

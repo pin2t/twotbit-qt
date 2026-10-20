@@ -19,9 +19,13 @@ int main(int argc, char* argv[]) {
     QApplication::setApplicationVersion(TWOTBIT_VERSION);
     QApplication::setOrganizationName("pin2t");
     QApplication::setOrganizationDomain("pin2t.com");
+#ifdef Q_OS_LINUX
+    // The desktop entry the window belongs to, whose icon GNOME shows for it.
+    QApplication::setDesktopFileName("com.pin2t.Twotbit");
+#endif
     QApplication app(argc, argv);
     // The Windows 11 look, light and dark, on Windows 10 too. The Mac keeps
-    // its own.
+    // its own, and Linux takes Fusion in the desktop's colors.
     if (QStyleFactory::keys().contains("windows11", Qt::CaseInsensitive)) QApplication::setStyle("windows11");
     QIcon icon;
     for (int size : {16, 32, 64, 128, 256, 512}) icon.addFile(QString(":/icons/icon_%1.png").arg(size), QSize(size, size));

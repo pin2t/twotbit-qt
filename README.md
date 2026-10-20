@@ -1,11 +1,11 @@
-# Twotbit for Windows and macOS
+# Twotbit for Windows, macOS and Linux
 
-A native Windows and macOS SPV Bitcoin wallet in C++ and Qt: BIP84 keys, a
-fully validated block header chain, BIP157/158 compact block filters and a
-small pool of P2P peers, reached directly.
+A native Windows, macOS and Linux SPV Bitcoin wallet in C++ and Qt: BIP84
+keys, a fully validated block header chain, BIP157/158 compact block filters
+and a small pool of P2P peers, reached directly.
 
 It is the [Swift macOS app](../macos) rebuilt in Qt, for Windows first and
-for the Mac too. Its wallet engine is a
+for the Mac and Linux too. Its wallet engine is a
 C++20 port of the Swift TwotbitKit, checked against the same bitfyn and btcd
 vectors. The Qt Widgets window follows the SwiftUI one page by page. Tor and
 I2P are not ported: peers are always dialed directly.
@@ -135,6 +135,59 @@ address. The icons are the SF Symbols the Swift app shows. Buttons, fields
 and focus rings take the accent color set in System Settings, as Mac apps
 do.
 
+### Linux
+
+Requires an x86-64 Linux desktop with a C++20 compiler, CMake 3.21 or
+later, Ninja, pkg-config, the OpenGL and libsecret development files, and
+Qt 6.8 or later for Linux (`gcc_64`). The app was built on Ubuntu 24.04 with
+GCC 13.3 and Qt 6.12.0. On Ubuntu or Debian, the tools and libraries come
+from apt (`libxcb-cursor0` is what Qt's X11 plugin loads), and Qt from the
+Qt online installer or aqtinstall:
+
+```sh
+sudo apt install build-essential cmake ninja-build pkg-config libgl-dev libsecret-1-dev libxcb-cursor0
+python3 -m venv ~/.local/share/aqt-venv
+~/.local/share/aqt-venv/bin/pip install aqtinstall
+~/.local/share/aqt-venv/bin/aqt install-qt linux desktop 6.12.0 linux_gcc_64 -O ~/Qt
+```
+
+Then, with the path of your Qt installation:
+
+```sh
+cmake -S . -B build -G Ninja -DCMAKE_PREFIX_PATH=$HOME/Qt/6.12.0/gcc_64
+cmake --build build
+build/common/app/twotbit -net signet
+```
+
+`cmake --build build --target deploy` collects a folder that runs on recent
+x86-64 Linux desktops in `build/deploy/twotbit`, with the Qt libraries and
+plugins that Qt's deployment script finds it needs, and packs it into
+`twotbit-0.1.0-linux-x86_64.tar.gz` next to it, about 32 MB. Unpack it
+anywhere and run `twotbit/install.sh` to add Twotbit to your applications:
+it writes the desktop entry and the icons to `~/.local/share`, and, with
+sudo, the polkit action of the password check to
+`/usr/share/polkit-1/actions`, the only place polkit reads it from.
+`sudo cmake --install build --prefix /usr` installs the same files for the
+Qt the build used.
+
+On Linux the options are read the same way, with these defaults and places:
+
+| | Linux |
+|---|---|
+| data folder | `~/.local/share/Twotbit` |
+| saved options | `~/.config/pin2t/Twotbit.conf`, such as `net=signet` under `[General]` |
+| recovery phrase | the default Secret Service collection, the login keyring that GNOME Keyring unlocks as you sign in (or KWallet), as an item with the attributes `service` `com.pin2t.twotbit` and `account` the account public key |
+| before the phrase is shown | your account password, or fingerprint, in the desktop's polkit dialog |
+| log | `twotbit.log` in the data folder; `TWOTBIT_LOG_STDERR=1` echoes it to the terminal |
+
+Without the polkit action installed, or without polkit, Settings shows the
+phrase without asking, as on a Mac without a password. Where the keyring
+does not exist yet, the desktop asks for a password for a new one the first
+time a wallet is created. The window uses the Fusion style in the
+desktop's light or dark colors, the icon theme's symbolic icons and the
+desktop's monospaced font, and Show in Files opens the data folder in the
+file manager.
+
 ### The recovery phrase and the Credential Manager
 
 The recovery phrase is kept in the Windows Credential Manager, as the
@@ -214,6 +267,13 @@ windows/                what is Windows' own, added to the common targets
   tests/                the Credential Manager and Windows Hello suites, and
                         the Winsock listeners of the mock nodes
   scripts/make-icon.ps1 packs the macOS app's icon images into twotbit.ico
+linux/                  what is Linux's own, added to the common targets
+  core/p2p/tcp.cpp      TCP and DNS over sockets
+  core/storage          the Secret Service secret store, through libsecret
+  app/                  polkit's password check before the phrase is shown
+    resources           the desktop entry and the polkit action
+  tests/                the keyring suite, the mock nodes' listeners
+  scripts/install.sh    adds the deployed folder to the user's applications
 tests/                  the QtTest suites, the fixture reader, a mock Bitcoin node
 third_party/sqlite      SQLite 3.53.4, the amalgamation
 ```
@@ -241,6 +301,11 @@ On the Mac, `ctest --test-dir build` runs the same tests and the keychain
 suite in about three seconds; `TWOTBIT_SKIP_KEYCHAIN=1` skips the keychain
 one where there is no unlocked login keychain. `build/tests/twotbit_tests`
 takes the same arguments as on Windows.
+
+On Linux, `ctest --test-dir build` runs the same tests and the keyring
+suite in about three seconds. The keyring suite needs a running Secret
+Service with an unlocked default collection; `TWOTBIT_SKIP_KEYRING=1` skips
+it elsewhere, as on a build machine without a desktop session.
 
 `build\twotbit_tests.exe` takes the suites to run first, then QtTest's
 options, such as `build\twotbit_tests.exe SyncTests fullSync`. QtTest's

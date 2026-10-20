@@ -30,14 +30,15 @@ public:
 
 /// CredentialSecretStore keeps secrets in the platform's store of the
 /// signed-in user's credentials, kept on this computer only: generic
-/// credentials of the Windows Credential Manager (windows/core/storage), or
-/// generic passwords of the macOS login keychain (macos/core/storage).
+/// credentials of the Windows Credential Manager (windows/core/storage),
+/// generic passwords of the macOS login keychain (macos/core/storage), or
+/// items of the Secret Service keyring on Linux (linux/core/storage).
 class CredentialSecretStore : public SecretStore {
 public:
     explicit CredentialSecretStore(std::string service) : service_(std::move(service)) {}
 
     /// The name of the platform's credential store, as messages show it:
-    /// "Windows Credential Manager" or "Keychain".
+    /// "Windows Credential Manager", "Keychain" or "keyring".
     static const char* storeName();
 
     std::optional<std::string> secret(const std::string& account) override;

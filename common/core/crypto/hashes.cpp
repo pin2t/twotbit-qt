@@ -8,6 +8,9 @@
 #include <bcrypt.h>
 #elif defined(__APPLE__)
 #include <stdlib.h>
+#elif defined(__linux__)
+#include <sys/random.h>
+#include <cerrno>
 #else
 #include <random>
 #endif
@@ -295,6 +298,17 @@ Bytes randomBytes(size_t count) {
         throw std::runtime_error("no secure random bytes");
 #elif defined(__APPLE__)
     arc4random_buf(out.data(), count);
+#elif defined(__linux__)
+    // The kernel's generator, which blocks only until it is first seeded at
+    // boot.
+    for (size_t done = 0; done < count;) {
+        ssize_t n = getrandom(out.data() + done, count - done, 0);
+        if (n < 0) {
+            if (errno == EINTR) continue;
+            throw std::runtime_error("no secure random bytes");
+        }
+        done += size_t(n);
+    }
 #else
     std::random_device device;
     for (auto& b : out) b = uint8_t(device());

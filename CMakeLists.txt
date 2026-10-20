@@ -1,9 +1,10 @@
 # Twotbit: the Qt Widgets app over the wallet engine library. common/ holds
-# the engine and the app every platform builds; windows/ and macos/ add what
-# is each platform's own.
+# the engine and the app every platform builds; windows/, macos/ and linux/
+# add what is each platform's own.
 #
 #   cmake -S . -B build -G Ninja -DCMAKE_PREFIX_PATH=C:/Qt/6.12.0/mingw_64
 #   cmake -S . -B build -G Ninja -DCMAKE_PREFIX_PATH=~/Qt/6.12.0/macos
+#   cmake -S . -B build -G Ninja -DCMAKE_PREFIX_PATH=~/Qt/6.12.0/gcc_64
 #   cmake --build build
 #   ctest --test-dir build
 cmake_minimum_required(VERSION 3.21)
@@ -49,6 +50,8 @@ if(WIN32)
     add_subdirectory(windows)
 elseif(APPLE)
     add_subdirectory(macos)
+elseif(CMAKE_SYSTEM_NAME STREQUAL "Linux")
+    add_subdirectory(linux)
 endif()
 
 if(TWOTBIT_BUILD_TESTS)

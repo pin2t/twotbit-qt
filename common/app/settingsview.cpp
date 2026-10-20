@@ -8,6 +8,14 @@
 #include <QPushButton>
 #include <QScrollArea>
 
+#ifdef Q_OS_LINUX
+#include <QDBusConnection>
+#include <QDBusMessage>
+#include <QDBusPendingCallWatcher>
+#include <QDesktopServices>
+#include <QUrl>
+#endif
+
 #include "phrasedialog.h"
 #include "ownerauth.h"
 
@@ -103,6 +111,8 @@ SettingsView::SettingsView(AppModel& model, QWidget* parent)
     folderLayout->addWidget(folder_, 1);
 #ifdef Q_OS_MACOS
     auto* explorer = new QPushButton("Show in Finder");
+#elif defined(Q_OS_LINUX)
+    auto* explorer = new QPushButton("Show in Files");
 #else
     auto* explorer = new QPushButton("Show in Explorer");
 #endif
@@ -136,6 +146,19 @@ SettingsView::SettingsView(AppModel& model, QWidget* parent)
     connect(explorer, &QPushButton::clicked, this, [this] {
 #ifdef Q_OS_MACOS
         QProcess::startDetached("/usr/bin/open", {"-R", model_.options().dataDirectory});
+#elif defined(Q_OS_LINUX)
+        // The folder selected in the file manager's window, as GNOME Files
+        // and the others show it through FileManager1, or the folder opened
+        // where none answers.
+        QUrl folder = QUrl::fromLocalFile(model_.options().dataDirectory);
+        QDBusMessage call = QDBusMessage::createMethodCall("org.freedesktop.FileManager1", "/org/freedesktop/FileManager1",
+                                                           "org.freedesktop.FileManager1", "ShowItems");
+        call << QStringList{folder.toString()} << QString();
+        auto* watcher = new QDBusPendingCallWatcher(QDBusConnection::sessionBus().asyncCall(call), this);
+        connect(watcher, &QDBusPendingCallWatcher::finished, this, [folder](QDBusPendingCallWatcher* w) {
+            if (w->isError()) QDesktopServices::openUrl(folder);
+            w->deleteLater();
+        });
 #else
         QProcess::startDetached("explorer.exe", {"/select,", QDir::toNativeSeparators(model_.options().dataDirectory)});
 #endif

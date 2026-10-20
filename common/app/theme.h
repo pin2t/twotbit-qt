@@ -15,7 +15,8 @@ class QWidget;
 
 /// Glyph names the icons the window uses, drawn as the platform's own apps
 /// draw theirs: from the Segoe Fluent Icons or Segoe MDL2 Assets font on
-/// Windows, and as the SF Symbols the Swift app shows on the Mac.
+/// Windows, as the SF Symbols the Swift app shows on the Mac, and as the
+/// symbolic icons of the desktop's icon theme on Linux.
 enum class Glyph { home, coins, transactions, settings, copy, receive, send, merge, split, arrowRight, warning, warningFilled, checkFilled, key, sortUp, sortDown };
 
 /// Theme is the look of the window in light and dark mode: the Bitcoin
@@ -55,6 +56,10 @@ QString symbolName(Glyph g);
 /// unless given, scaled down when it would not fit, and bold when told; null
 /// when the system has no such symbol.
 QImage symbol(const QString& name, int pixels, double points = 0, bool bold = false);
+#elif defined(Q_OS_LINUX)
+/// The names of the glyph's symbolic icon in freedesktop icon themes, the
+/// first one the theme has drawn: Yaru's or Adwaita's on GNOME.
+QStringList iconNames(Glyph g);
 #endif
 
 /// The bitcoin sign, bold, in the color on a transparent square of the

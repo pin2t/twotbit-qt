@@ -1,0 +1,12 @@
+[Desktop Entry]
+Type=Application
+Name=Twotbit
+GenericName=Bitcoin Wallet
+Comment=SPV Bitcoin wallet
+Exec=twotbit
+Icon=com.pin2t.Twotbit
+Terminal=false
+Categories=Office;Finance;
+Keywords=bitcoin;wallet;btc;spv;
+StartupNotify=true
+StartupWMClass=Twotbit
